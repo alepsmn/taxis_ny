@@ -30,13 +30,27 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Definir el backlog verificable de la fase 1.
+Inspeccionar los metadatos físicos de Yellow Taxi 2024-01.
 
 ## Criterio de aceptación de la tarea
 
-- Cada tarea de la fase 1 tiene un resultado observable.
-- Cada tarea incluye un criterio de aceptación verificable.
-- El backlog no introduce implementación del pipeline ni tecnologías fuera del alcance.
+- El archivo puede abrirse como Parquet.
+- Se registran número de filas, columnas, tipos físicos, row groups y compresión.
+- El procedimiento utilizado queda documentado y puede repetirse sobre el mismo archivo.
+- No se perfilan todavía rangos, nulos ni reglas semánticas de calidad.
+
+## Último resultado verificado
+
+- `yellow_tripdata_2024-01.parquet` descargado manualmente mediante `curl`.
+- Tamaño comprobado: `49,961,641` bytes.
+- SHA-256 comprobado: `c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510`.
+- `git status --short` no muestra el archivo.
+- `yellow_tripdata_2025-01.parquet` descargado manualmente mediante `curl` y publicado localmente después de completar el archivo `.part`.
+- Tamaño comprobado: `59,158,238` bytes.
+- SHA-256 comprobado: `9af277e4c0d3f9deb30644da822981e1e7df6af58313170fd3aa8a474485488a`.
+- `git status --short` no muestra ninguno de los Parquet.
+- `docs/reference-data.md` registra URL, fecha de descarga, tamaño y SHA-256 de ambos archivos.
+- La adquisición fue manual y no implementó un extractor.
 
 ## Pendiente para cerrar la fase 0
 
@@ -54,7 +68,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Convertir las tareas de reconocimiento de datos de la fase 1 en un backlog con criterios de aceptación.
+Identificar una herramienta local adecuada para leer metadatos Parquet sin cargar todas las filas en memoria.
 
 ## Documento de fase
 
