@@ -1,1 +1,5 @@
-doc/
+.local/
+data/
+.env
+*.log
+*.sqlite
