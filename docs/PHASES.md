@@ -8,8 +8,9 @@ Al iniciar una sesión:
 
 1. Leer `AGENTS.md`.
 2. Leer `STATUS.md`.
-3. Leer solo la fase activa en este documento o su documento específico.
-4. Consultar `ROADMAP.md` únicamente ante contradicciones, cambios de fase o decisiones de alcance.
+3. Leer `docs/DECISION_LOG.md`.
+4. Leer solo la fase activa en este documento o su documento específico.
+5. Consultar `ROADMAP.md` únicamente ante contradicciones, cambios de fase o decisiones de alcance.
 
 No se avanza por calendario. Cada fase termina cuando su puerta de salida queda demostrada.
 

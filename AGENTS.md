@@ -54,6 +54,8 @@ Al comenzar:
 
 Lee STATUS.md.
 
+Lee docs/DECISION_LOG.md.
+
 Lee únicamente el documento de fase indicado allí.
 
 Revisa git status, el diff y los archivos relevantes para la tarea.
@@ -65,6 +67,20 @@ No leas el roadmap o manual completos salvo cambio de fase, contradicción o pet
 Resume: fase activa, estado comprobado, criterio pendiente y siguiente tarea única.
 
 Si STATUS.md falta o está desactualizado, señálalo. No inventes el estado del proyecto.
+
+Memoria operativa del proyecto
+
+El agente mantiene dos registros ligeros y versionados:
+
+STATUS.md contiene únicamente el estado operativo actual: fase, evidencia, tarea activa, criterio de aceptación, pendientes, bloqueos y siguiente paso único.
+
+docs/DECISION_LOG.md conserva una secuencia cronológica breve de decisiones reales, cambios de criterio y decisiones diferidas. Su objetivo es reconstruir cómo evolucionó el proyecto sin releer conversaciones, código completo o ADRs extensos.
+
+El agente actualiza ambos documentos cuando una tarea o decisión cambia su contenido. No espera a que el usuario redacte esas actualizaciones, pero debe mostrar el diff y no registrar como hecho nada que no esté comprobado.
+
+El Decision Log no sustituye a un ADR. Cada entrada indica contexto, decisión, fundamento confirmado, consecuencia, estado y evidencia. Una decisión arquitectónica que resulte difícil de reconstruir se promueve después a ADR y queda enlazada desde la entrada original.
+
+No registres conversaciones completas, hipótesis descartables ni motivaciones inferidas. Distingue decisión confirmada, propuesta, decisión diferida y hecho observado.
 
 Modo de trabajo
 
@@ -113,6 +129,24 @@ Pide una explicación sin copiar la anterior.
 Registra la decisión en test, documentación o ADR.
 
 Escalera de ayuda: reformulación → pregunta dirigida → pista → pseudocódigo → interfaz → ejemplo aislado → parche mínimo. No saltes directamente al final.
+
+Calibración de primera exposición
+
+No presupongas experiencia profesional ni familiaridad con artefactos de ingeniería que todavía no se hayan enseñado. El usuario está aprendiendo Data Engineering durante el grado; reconocer un término no implica saber diseñar con él.
+
+Cuando aparezca por primera vez un concepto, herramienta o artefacto:
+
+explica en lenguaje directo qué problema resuelve;
+
+define el vocabulario mínimo necesario;
+
+muestra un ejemplo completo y limitado;
+
+comprueba una sola idea esencial mediante una pregunta concreta;
+
+pide después una variación pequeña del ejemplo, no un diseño desde cero.
+
+En la segunda exposición, usa una plantilla guiada y deja decisiones acotadas al usuario. Solo exige formulación autónoma cuando exista evidencia previa de comprensión. Si el usuario se pierde, reduce alcance y vuelve al último concepto comprendido; no añadas simultáneamente más estructura, terminología y criterios.
 
 Reglas conceptuales
 

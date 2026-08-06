@@ -20,6 +20,7 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 - `AGENTS.md` contiene las reglas de trabajo y aprendizaje.
 - `docs/ROADMAP.md` conserva el plan detallado.
 - `docs/PHASES.md` proporciona el contexto resumido por fases.
+- `docs/DECISION_LOG.md` conserva la secuencia breve de decisiones confirmadas, diferidas o sustituidas.
 - `.gitignore` excluye `.local/`, datos, secretos, logs y bases SQLite locales.
 
 ## Evidencia
@@ -29,13 +30,13 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Elegir y versionar la licencia del repositorio.
+Definir el backlog verificable de la fase 1.
 
 ## Criterio de aceptación de la tarea
 
-- Existe un archivo `LICENSE` en la raíz.
-- La licencia elegida coincide con la intención de reutilización del autor.
-- El cambio queda revisado y registrado en un commit específico.
+- Cada tarea de la fase 1 tiene un resultado observable.
+- Cada tarea incluye un criterio de aceptación verificable.
+- El backlog no introduce implementación del pipeline ni tecnologías fuera del alcance.
 
 ## Pendiente para cerrar la fase 0
 
@@ -43,13 +44,17 @@ Elegir y versionar la licencia del repositorio.
 - Crear el backlog de tareas de la fase 1.
 - Clonar el repositorio en otra carpeta y verificar que el contexto del proyecto se recupera sin archivos locales ocultos.
 
+## Decisiones diferidas
+
+- La licencia del repositorio se decidirá más adelante. La fase 0 no puede cerrarse hasta resolverla o modificar explícitamente su puerta de salida.
+
 ## Bloqueos
 
 Ninguno.
 
 ## Siguiente paso único
 
-Decidir qué permisos de reutilización debe conceder la licencia antes de seleccionar su texto.
+Convertir las tareas de reconocimiento de datos de la fase 1 en un backlog con criterios de aceptación.
 
 ## Documento de fase
 
