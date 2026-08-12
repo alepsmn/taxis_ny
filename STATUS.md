@@ -1,6 +1,6 @@
 # Estado actual
 
-Última actualización: 6 de agosto de 2026.
+Última actualización: 12 de agosto de 2026.
 
 ## Fase activa
 
@@ -30,14 +30,14 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Inspeccionar los metadatos físicos de Yellow Taxi 2024-01.
+Versionar el entorno reproducible y la inspección física de Yellow Taxi 2024-01.
 
 ## Criterio de aceptación de la tarea
 
-- El archivo puede abrirse como Parquet.
-- Se registran número de filas, columnas, tipos físicos, row groups y compresión.
-- El procedimiento utilizado queda documentado y puede repetirse sobre el mismo archivo.
-- No se perfilan todavía rangos, nulos ni reglas semánticas de calidad.
+- El diff contiene únicamente el entorno reproducible, el script de inspección, la documentación y la memoria operativa relacionadas.
+- `.venv/`, los Parquet y `docs/adr/LOG_PREGUNTAS.md` no se incluyen.
+- `uv lock --check`, el script de inspección y `git diff --check` finalizan correctamente.
+- El cambio queda registrado en un commit pequeño y descriptivo.
 
 ## Último resultado verificado
 
@@ -51,6 +51,16 @@ Inspeccionar los metadatos físicos de Yellow Taxi 2024-01.
 - `git status --short` no muestra ninguno de los Parquet.
 - `docs/reference-data.md` registra URL, fecha de descarga, tamaño y SHA-256 de ambos archivos.
 - La adquisición fue manual y no implementó un extractor.
+- `uv 0.12.2` está instalado en WSL en `/home/alex/.local/bin/uv` y el binario responde correctamente mediante su ruta absoluta.
+- `uv init --bare --python 3.12` creó `pyproject.toml` sin entorno virtual; `requires-python = ">=3.12,<3.13"` limita el proyecto a Python 3.12.x.
+- `uv python pin 3.12` creó `.python-version` con `3.12`; esto fija la versión solicitada, pero todavía no prueba que el intérprete pueda ejecutarse.
+- `.gitignore` excluye `.venv/`; `git check-ignore -v --no-index .venv/test` confirma la regla antes de crear el entorno.
+- `uv sync` creó `.venv/` y `uv.lock`; `uv run python --version` ejecuta Python 3.12.13, `.venv/` no aparece en `git status` y DuckDB todavía no está instalado.
+- `uv add duckdb` declaró `duckdb>=1.5.5`; DuckDB 1.5.5 se importa correctamente y `uv lock --check` confirma que `uv.lock` está actualizado.
+- DuckDB abre `yellow_tripdata_2024-01.parquet`: el footer declara 2.964.624 filas, 3 row groups y 19 columnas hoja; los tipos físicos observados son `INT32`, `INT64`, `DOUBLE` y `BYTE_ARRAY`.
+- Los tres row groups contienen 1.048.576, 1.048.576 y 867.472 filas, todos con compresión `ZSTD`; su suma coincide con las 2.964.624 filas del footer.
+- `scripts/inspect_parquet_metadata.py` y `docs/reference-data.md` conservan el procedimiento y el resultado verificado sin perfilar valores de viajes.
+- El autor explicó correctamente que el footer describe la estructura interna y que SHA-256 se calcula externamente sobre todos los bytes para detectar cambios de contenido.
 
 ## Pendiente para cerrar la fase 0
 
@@ -68,7 +78,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Identificar una herramienta local adecuada para leer metadatos Parquet sin cargar todas las filas en memoria.
+Revisar y preparar para commit únicamente los archivos relacionados con el entorno reproducible y la inspección Parquet.
 
 ## Documento de fase
 

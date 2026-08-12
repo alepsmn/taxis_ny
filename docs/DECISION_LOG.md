@@ -73,3 +73,13 @@ Cada entrada contiene:
 - **Estado:** vigente.
 - **Evidencia:** `AGENTS.md` y conversación del 6 de agosto de 2026 durante la definición del backlog de la fase 1.
 - **Promoción a ADR:** no necesaria; es una regla pedagógica y de colaboración.
+
+## 2026-08-06 — D-007 — Gestión del entorno Python con uv
+
+- **Contexto:** el sistema WSL ofrece Python 3.14.4, mientras que la arquitectura del proyecto establece Python 3.12; además, no existe todavía un manifiesto reproducible de dependencias.
+- **Decisión:** usar `uv` para gestionar Python 3.12, el entorno virtual y el bloqueo de dependencias del proyecto.
+- **Fundamento confirmado:** el autor confirmó la decisión después de distinguir las responsabilidades de `pyproject.toml`, `uv.lock` y `.venv/`.
+- **Consecuencia:** se crearán `.python-version`, `pyproject.toml` y `uv.lock` versionados; `.venv/` será local y reconstruible. DuckDB se declarará como dependencia directa antes de inspeccionar los metadatos Parquet.
+- **Estado:** vigente.
+- **Evidencia:** confirmación del autor en la conversación del 6 de agosto de 2026 y `STATUS.md`.
+- **Promoción a ADR:** si `uv` condiciona el despliegue o debe compararse con otro gestor por una limitación observada.

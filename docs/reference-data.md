@@ -22,3 +22,47 @@ git status --short
 
 Un cambio futuro de SHA-256 para el mismo mes se tratará como una posible
 revisión del origen, no como el mismo archivo.
+
+## Metadatos físicos de Yellow Taxi 2024-01
+
+Procedimiento:
+
+```bash
+uv sync
+uv run python scripts/inspect_parquet_metadata.py
+```
+
+Resultado verificado el 12 de agosto de 2026:
+
+- Filas: 2.964.624.
+- Columnas físicas: 19.
+- Row groups: 3.
+- Filas por row group: 1.048.576, 1.048.576 y 867.472.
+- Compresión: ZSTD en todos los column chunks.
+- Tipos físicos observados: INT32, INT64, DOUBLE y BYTE_ARRAY.
+
+| Columna | Tipo físico |
+|---|---|
+| VendorID | INT32 |
+| tpep_pickup_datetime | INT64 |
+| tpep_dropoff_datetime | INT64 |
+| passenger_count | INT64 |
+| trip_distance | DOUBLE |
+| RatecodeID | INT64 |
+| store_and_fwd_flag | BYTE_ARRAY |
+| PULocationID | INT32 |
+| DOLocationID | INT32 |
+| payment_type | INT64 |
+| fare_amount | DOUBLE |
+| extra | DOUBLE |
+| mta_tax | DOUBLE |
+| tip_amount | DOUBLE |
+| tolls_amount | DOUBLE |
+| improvement_surcharge | DOUBLE |
+| total_amount | DOUBLE |
+| congestion_surcharge | DOUBLE |
+| Airport_fee | DOUBLE |
+
+El script consulta el footer Parquet mediante las funciones
+`parquet_file_metadata()`, `parquet_schema()` y `parquet_metadata()` de
+DuckDB. No realiza perfilado de valores ni carga todas las filas.
