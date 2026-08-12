@@ -30,14 +30,15 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Versionar el entorno reproducible y la inspección física de Yellow Taxi 2024-01.
+Verificar la recuperación del proyecto desde un clon limpio.
 
 ## Criterio de aceptación de la tarea
 
-- El diff contiene únicamente el entorno reproducible, el script de inspección, la documentación y la memoria operativa relacionadas.
-- `.venv/`, los Parquet y `docs/adr/LOG_PREGUNTAS.md` no se incluyen.
-- `uv lock --check`, el script de inspección y `git diff --check` finalizan correctamente.
-- El cambio queda registrado en un commit pequeño y descriptivo.
+- El repositorio se clona en otra carpeta desde `origin`.
+- El clon contiene el alcance, las reglas, el estado, la bitácora y el procedimiento de inspección versionados.
+- El clon no contiene `.venv/`, archivos Parquet ni otras dependencias del estado local original.
+- `uv sync` reconstruye el entorno y `uv run python --version` ejecuta Python 3.12.x.
+- Se documenta el resultado observable de la comprobación.
 
 ## Último resultado verificado
 
@@ -61,6 +62,7 @@ Versionar el entorno reproducible y la inspección física de Yellow Taxi 2024-0
 - Los tres row groups contienen 1.048.576, 1.048.576 y 867.472 filas, todos con compresión `ZSTD`; su suma coincide con las 2.964.624 filas del footer.
 - `scripts/inspect_parquet_metadata.py` y `docs/reference-data.md` conservan el procedimiento y el resultado verificado sin perfilar valores de viajes.
 - El autor explicó correctamente que el footer describe la estructura interna y que SHA-256 se calcula externamente sobre todos los bytes para detectar cambios de contenido.
+- `3ae3d95 feat: add reproducible Parquet metadata inspection` versiona el entorno, el script y la evidencia; `main` y `origin/main` están sincronizadas y el árbol quedó limpio tras el commit.
 
 ## Pendiente para cerrar la fase 0
 
@@ -78,7 +80,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Revisar y preparar para commit únicamente los archivos relacionados con el entorno reproducible y la inspección Parquet.
+Clonar `origin` en una carpeta temporal distinta y comprobar qué contexto y entorno pueden reconstruirse sin los archivos locales originales.
 
 ## Documento de fase
 
