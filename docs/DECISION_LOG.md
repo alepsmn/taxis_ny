@@ -83,3 +83,13 @@ Cada entrada contiene:
 - **Estado:** vigente.
 - **Evidencia:** confirmación del autor en la conversación del 6 de agosto de 2026 y `STATUS.md`.
 - **Promoción a ADR:** si `uv` condiciona el despliegue o debe compararse con otro gestor por una limitación observada.
+
+## 2026-08-12 — D-008 — Ejecución de Git dentro de WSL2
+
+- **Contexto:** Git ejecutado desde PowerShell sobre la ruta UNC de WSL2 rechazó el repositorio por `dubious ownership`, aunque Git dentro de Ubuntu accede correctamente al mismo árbol.
+- **Decisión:** ejecutar los comandos del repositorio dentro de Ubuntu y usar la ruta Linux `/home/alex/taxis_ny`; no añadir una excepción global de `safe.directory` para la ruta UNC.
+- **Fundamento confirmado:** el fallo se reprodujo desde PowerShell y las mismas comprobaciones funcionaron mediante `wsl.exe -d Ubuntu -- bash -lc`.
+- **Consecuencia:** las sesiones posteriores deben entrar en WSL2 antes de ejecutar Git, evitando repetir el diagnóstico o alterar la configuración global.
+- **Estado:** vigente.
+- **Evidencia:** `AGENTS.md` y comprobación del 12 de agosto de 2026.
+- **Promoción a ADR:** no necesaria; es una convención operativa local, no una decisión arquitectónica del pipeline.
