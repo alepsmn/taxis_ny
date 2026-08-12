@@ -53,7 +53,8 @@ Contexto de cada sesión
 Al comenzar:
 
 Ejecuta los comandos del repositorio dentro de WSL2, desde `/home/alex/taxis_ny`.
-Si el agente parte de PowerShell, usa `wsl.exe -d Ubuntu -- bash -lc '<comando>'`.
+Si el agente parte de PowerShell, prefiere la ejecución directa, por ejemplo `wsl.exe -d Ubuntu -- git -C /home/alex/taxis_ny status --short --branch`.
+No incrustes expresiones Bash como `$()` o `$variable` en una cadena de PowerShell con comillas dobles: PowerShell puede evaluarlas antes de entregarlas a WSL. Para lógica compuesta, entra en una shell WSL o divide la comprobación en invocaciones directas.
 No ejecutes Git sobre la ruta UNC `\\wsl.localhost\Ubuntu\home\alex\taxis_ny`: puede producir un falso error de `dubious ownership` por la frontera Windows/WSL. No añadas una excepción global de `safe.directory` para ocultarlo.
 
 Lee STATUS.md.

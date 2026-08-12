@@ -30,7 +30,7 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Verificar la recuperación del proyecto desde un clon limpio.
+Cerrar la verificación de recuperación del proyecto desde un clon limpio: versionar la evidencia y comprobar que el autor puede explicar la garantía obtenida.
 
 ## Criterio de aceptación de la tarea
 
@@ -63,12 +63,18 @@ Verificar la recuperación del proyecto desde un clon limpio.
 - `scripts/inspect_parquet_metadata.py` y `docs/reference-data.md` conservan el procedimiento y el resultado verificado sin perfilar valores de viajes.
 - El autor explicó correctamente que el footer describe la estructura interna y que SHA-256 se calcula externamente sobre todos los bytes para detectar cambios de contenido.
 - `3ae3d95 feat: add reproducible Parquet metadata inspection` versiona el entorno, el script y la evidencia; `main` y `origin/main` están sincronizadas y el árbol quedó limpio tras el commit.
+- `origin/main` se clonó en `/tmp/taxis-ny-recovery-asqp52/taxis_ny` desde el commit `4663948`.
+- El clon contiene `README.md`, `AGENTS.md`, `STATUS.md`, `docs/DECISION_LOG.md`, `docs/PHASES.md`, `docs/reference-data.md`, el script de inspección, `.python-version`, `pyproject.toml`, `uv.lock` y `.gitignore`.
+- Antes de reconstruir el entorno, el clon no contenía `.venv/`, `data/`, `.local/`, `.env` ni archivos Parquet, SQLite o log.
+- `/home/alex/.local/bin/uv sync --locked` reconstruyó `.venv/` con Python 3.12.13 y DuckDB 1.5.5. El aviso de copia en lugar de hardlinks no impidió la instalación.
+- Después de reconstruir el entorno, `git status --short --branch` mostró `main...origin/main` sin cambios; `.venv/` continuó fuera del estado versionado.
+- El autor explicó correctamente que el clon debe contener lo necesario para reconstruir el entorno sin depender del estado local y que la prueba no detecta secretos ya versionados ni archivos sensibles fuera de los patrones comprobados.
 
 ## Pendiente para cerrar la fase 0
 
 - Versionar la licencia.
 - Crear el backlog de tareas de la fase 1.
-- Clonar el repositorio en otra carpeta y verificar que el contexto del proyecto se recupera sin archivos locales ocultos.
+- Versionar el resultado de la prueba de recuperación y comprobar la explicación del autor antes de cerrar la tarea.
 
 ## Decisiones diferidas
 
@@ -80,7 +86,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Clonar `origin` en una carpeta temporal distinta y comprobar qué contexto y entorno pueden reconstruirse sin los archivos locales originales.
+Revisar y versionar la evidencia de recuperación y las correcciones operativas de acceso a WSL2.
 
 ## Documento de fase
 

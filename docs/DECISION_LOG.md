@@ -88,7 +88,7 @@ Cada entrada contiene:
 
 - **Contexto:** Git ejecutado desde PowerShell sobre la ruta UNC de WSL2 rechazó el repositorio por `dubious ownership`, aunque Git dentro de Ubuntu accede correctamente al mismo árbol.
 - **Decisión:** ejecutar los comandos del repositorio dentro de Ubuntu y usar la ruta Linux `/home/alex/taxis_ny`; no añadir una excepción global de `safe.directory` para la ruta UNC.
-- **Fundamento confirmado:** el fallo se reprodujo desde PowerShell y las mismas comprobaciones funcionaron mediante `wsl.exe -d Ubuntu -- bash -lc`.
+- **Fundamento confirmado:** el fallo se reprodujo desde PowerShell y las mismas comprobaciones funcionaron mediante ejecución directa con `wsl.exe -d Ubuntu -- git -C /home/alex/taxis_ny`; además, se observó que PowerShell puede evaluar expresiones Bash incluidas en cadenas dobles antes de entregarlas a WSL.
 - **Consecuencia:** las sesiones posteriores deben entrar en WSL2 antes de ejecutar Git, evitando repetir el diagnóstico o alterar la configuración global.
 - **Estado:** vigente.
 - **Evidencia:** `AGENTS.md` y comprobación del 12 de agosto de 2026.
