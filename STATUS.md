@@ -4,11 +4,11 @@
 
 ## Fase activa
 
-Fase 0 — Entorno y contrato del proyecto.
+Fase 1 — Reconocimiento y contrato de datos.
 
 ## Objetivo de la fase
 
-Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de implementar el pipeline.
+Diseñar desde evidencia reproducible de los Parquet reales de 2024-01 y 2025-01, no solo desde documentación externa.
 
 ## Estado comprobado
 
@@ -22,6 +22,8 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 - `docs/PHASES.md` proporciona el contexto resumido por fases.
 - `docs/DECISION_LOG.md` conserva la secuencia breve de decisiones confirmadas, diferidas o sustituidas.
 - `.gitignore` excluye `.local/`, datos, secretos, logs y bases SQLite locales.
+- La fase 0 quedó verificada: el repositorio se recupera desde un clon limpio y el entorno bloqueado se reconstruye sin datos ni estado local.
+- `docs/BACKLOG.md` descompone las entregas de la fase 1 en ocho tareas ordenadas de 45–120 minutos.
 
 ## Evidencia
 
@@ -30,15 +32,14 @@ Disponer de un repositorio remoto, recuperable y reproducible en WSL2 antes de i
 
 ## Tarea activa
 
-Cerrar la verificación de recuperación del proyecto desde un clon limpio: versionar la evidencia y comprobar que el autor puede explicar la garantía obtenida.
+F1-01 — Definir el perfil mínimo reproducible.
 
 ## Criterio de aceptación de la tarea
 
-- El repositorio se clona en otra carpeta desde `origin`.
-- El clon contiene el alcance, las reglas, el estado, la bitácora y el procedimiento de inspección versionados.
-- El clon no contiene `.venv/`, archivos Parquet ni otras dependencias del estado local original.
-- `uv sync` reconstruye el entorno y `uv run python --version` ejecuta Python 3.12.x.
-- Se documenta el resultado observable de la comprobación.
+- Quedan definidas las métricas necesarias por columna para reconocer ambos archivos.
+- Cada métrica tiene un propósito ligado al contrato o a una regla de calidad.
+- Se incluyen tipo lógico observado, nulabilidad, extremos relevantes y cardinalidad solo cuando aporta evidencia.
+- Se define el comando previsto, pero todavía no se implementa el perfil ni el pipeline.
 
 ## Último resultado verificado
 
@@ -70,15 +71,13 @@ Cerrar la verificación de recuperación del proyecto desde un clon limpio: vers
 - Después de reconstruir el entorno, `git status --short --branch` mostró `main...origin/main` sin cambios; `.venv/` continuó fuera del estado versionado.
 - El autor explicó correctamente que el clon debe contener lo necesario para reconstruir el entorno sin depender del estado local y que la prueba no detecta secretos ya versionados ni archivos sensibles fuera de los patrones comprobados.
 
-## Pendiente para cerrar la fase 0
+## Pendiente para cerrar la fase 1
 
-- Versionar la licencia.
-- Crear el backlog de tareas de la fase 1.
-- Versionar el resultado de la prueba de recuperación y comprobar la explicación del autor antes de cerrar la tarea.
+- Completar F1-01 a F1-08 según `docs/BACKLOG.md`.
 
 ## Decisiones diferidas
 
-- La licencia del repositorio se decidirá más adelante. La fase 0 no puede cerrarse hasta resolverla o modificar explícitamente su puerta de salida.
+- La licencia del repositorio se decidirá cuando exista una necesidad concreta de autorizar reutilización, modificación o redistribución. Desde el 12 de agosto de 2026 ya no bloquea el cierre de la fase 0.
 
 ## Bloqueos
 
@@ -86,8 +85,8 @@ Ninguno.
 
 ## Siguiente paso único
 
-Revisar y versionar la evidencia de recuperación y las correcciones operativas de acceso a WSL2.
+Para F1-01, anticipar qué decisión del contrato permite tomar cada métrica propuesta antes de escribir consultas.
 
 ## Documento de fase
 
-`docs/PHASES.md`, sección «Fase 0 — Entorno y contrato del proyecto».
+`docs/PHASES.md`, sección «Fase 1 — Reconocimiento y contrato de datos».

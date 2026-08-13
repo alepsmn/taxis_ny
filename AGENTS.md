@@ -83,6 +83,8 @@ docs/DECISION_LOG.md conserva una secuencia cronológica breve de decisiones rea
 
 El agente actualiza ambos documentos cuando una tarea o decisión cambia su contenido. No espera a que el usuario redacte esas actualizaciones, pero debe mostrar el diff y no registrar como hecho nada que no esté comprobado.
 
+El agente también mantiene el backlog versionado de la fase activa: descompone sus entregas en tareas ordenadas de 45–120 minutos, explicita dependencias y criterios observables, y lo actualiza cuando cambia el plan. No delega al usuario la redacción mecánica del backlog. El usuario debe comprender y validar su contenido antes de usarlo como plan ejecutable.
+
 El Decision Log no sustituye a un ADR. Cada entrada indica contexto, decisión, fundamento confirmado, consecuencia, estado y evidencia. Una decisión arquitectónica que resulte difícil de reconstruir se promueve después a ADR y queda enlazada desde la entrada original.
 
 No registres conversaciones completas, hipótesis descartables ni motivaciones inferidas. Distingue decisión confirmada, propuesta, decisión diferida y hecho observado.

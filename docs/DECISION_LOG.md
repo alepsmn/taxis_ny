@@ -93,3 +93,33 @@ Cada entrada contiene:
 - **Estado:** vigente.
 - **Evidencia:** `AGENTS.md` y comprobación del 12 de agosto de 2026.
 - **Promoción a ADR:** no necesaria; es una convención operativa local, no una decisión arquitectónica del pipeline.
+
+## 2026-08-12 — D-009 — La licencia deja de bloquear la fase 0
+
+- **Contexto:** la licencia seguía diferida y bloqueaba formalmente la fase 0, aunque no condiciona las tareas técnicas inmediatas ni existe todavía una necesidad de autorizar reutilización por terceros.
+- **Decisión:** mantener la licencia diferida, pero retirarla de la puerta de salida de la fase 0; se reconsiderará cuando exista una necesidad concreta de reutilización, modificación o redistribución.
+- **Fundamento confirmado:** decisión explícita del autor de no elegir una licencia todavía porque no afecta al trabajo técnico actual.
+- **Consecuencia:** crear el backlog de la fase 1 queda como único pendiente para cerrar la fase 0. Mientras no exista licencia, se mantienen los derechos de autor por defecto y el repositorio no concede permisos generales de reutilización.
+- **Estado:** vigente; sustituye la consecuencia de bloqueo de D-004, no la decisión de diferir la licencia.
+- **Evidencia:** `STATUS.md` y conversación del 12 de agosto de 2026.
+- **Promoción a ADR:** no necesaria; reconsiderar la decisión cuando la licencia pase a afectar distribución, colaboración o reutilización.
+
+## 2026-08-12 — D-010 — Mantenimiento del backlog por el agente
+
+- **Contexto:** trasladar al autor la redacción mecánica de cada entrada del backlog bloqueaba el avance y contradecía la responsabilidad del agente sobre la memoria operativa.
+- **Decisión:** el agente mantiene el backlog versionado de la fase activa; el autor comprende y valida el contenido y conserva la responsabilidad sobre las decisiones técnicas.
+- **Fundamento confirmado:** petición explícita del autor y coherencia con el modo GUIAR, que exige aprendizaje sin convertir al autor en mantenedor manual de los registros operativos.
+- **Consecuencia:** `docs/BACKLOG.md` contiene tareas ordenadas, dependencias, propiedades y criterios observables; `STATUS.md` conserva únicamente la tarea activa y el siguiente paso.
+- **Estado:** vigente.
+- **Evidencia:** `AGENTS.md`, `docs/BACKLOG.md` y conversación del 12 de agosto de 2026.
+- **Promoción a ADR:** no necesaria; es una regla de colaboración.
+
+## 2026-08-12 — D-011 — Inicio de la fase 1
+
+- **Contexto:** la recuperación desde clon limpio quedó verificada, la licencia dejó de bloquear la fase 0 y el backlog de la fase 1 quedó definido.
+- **Decisión:** cerrar la fase 0 e iniciar la fase 1 por F1-01, definición del perfil mínimo reproducible.
+- **Fundamento confirmado:** existen evidencia de clon limpio, entorno reconstruible y un backlog que cubre perfiles de ambos meses, comparación, contrato v0, reglas de calidad, ADR y verificación final.
+- **Consecuencia:** el trabajo activo pasa a reconocimiento y contrato; todavía no se implementa el downloader ni el pipeline productivo.
+- **Estado:** vigente.
+- **Evidencia:** `STATUS.md`, `docs/BACKLOG.md` y commits `239d48d` y `622a009`.
+- **Promoción a ADR:** no necesaria; es una transición de fase, no una decisión arquitectónica.
