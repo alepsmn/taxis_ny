@@ -85,7 +85,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Para F1-01, anticipar qué decisión del contrato permite tomar cada métrica propuesta antes de escribir consultas.
+Revisar y versionar `docs/profiling.md` y el backlog ampliado; después iniciar F1-02 con el diseño guiado de la interfaz de perfilado.
 
 ## Documento de fase
 
