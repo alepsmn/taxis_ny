@@ -1,6 +1,6 @@
 # Estado actual
 
-Última actualización: 16 de agosto de 2026.
+Última actualización: 17 de agosto de 2026.
 
 ## Fase activa
 
@@ -49,10 +49,14 @@ F1-02 — Perfilar valores de 2024-01.
 - Dos ejecuciones sobre la misma entrada producen salida idéntica byte a byte.
 - `VendorID` tiene 3 valores no nulos observados (`1`, `2`, `6`) y ningún `NULL`.
 - `RatecodeID` tiene 7 valores no nulos observados (`1`, `2`, `3`, `4`, `5`, `6`, `99`) y 140.162 `NULL` (4,727817 %).
-- La consulta y transformación de frecuencias se reutilizan para `VendorID`, `RatecodeID`, `store_and_fwd_flag`, `payment_type`, `PULocationID` y `DOLocationID`.
+- La consulta y transformación base de frecuencias se reutilizan para `VendorID`, `RatecodeID`, `store_and_fwd_flag`, `payment_type`, `PULocationID`, `DOLocationID` y `passenger_count`.
 - `store_and_fwd_flag` presenta `NULL`, `N` y `Y`: 140.162, 2.813.126 y 11.336 filas respectivamente.
 - `payment_type` presenta 5 valores no nulos (`0` a `4`); `PULocationID`, 260; y `DOLocationID`, 261.
-- `fetch_frequency_rows` limita los identificadores dinámicos a seis columnas conocidas; el script recuperó una estructura limpia y la salida sigue siendo idéntica entre dos ejecuciones.
+- `fetch_frequency_rows` limita los identificadores dinámicos a siete columnas conocidas; el script recuperó una estructura limpia y la salida sigue siendo idéntica entre dos ejecuciones.
+- `passenger_count` presenta 10 valores no nulos observados (`0` a `9`) y 140.162 `NULL`; el mínimo es `0`, el máximo `9` y no se observaron filas negativas (`0`, `0,0 %`).
+- El cálculo común de porcentajes y la transformación específica de `passenger_count` quedaron separados en funciones importables; cinco pruebas unitarias cubren redondeo, total cero, conteo de filas negativas, columna completamente nula y rechazo por SHA-256 sin salida estándar.
+- Dos ejecuciones del perfil completo sobre 2024-01 siguen produciendo JSON idéntico; las frecuencias de `passenger_count` suman las 2.964.624 filas.
+- El autor explicó correctamente que `negative_count` debe sumar `value_count` para medir filas negativas, no incrementar una vez por cada valor negativo distinto agrupado.
 - F1-01 quedó completada en `docs/profiling.md` y versionada en `44cb226`.
 - `docs/profiling.md` define las métricas comunes, por familia y cruzadas, su propósito y la interfaz prevista.
 - `yellow_tripdata_2024-01.parquet` descargado manualmente mediante `curl`.
@@ -97,7 +101,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Perfilar `passenger_count`: frecuencias, mínimo, máximo y valores negativos, reutilizando solo la transformación que corresponda.
+Esperar autorización para abrir el siguiente incremento de F1-02; `passenger_count` queda cerrado.
 
 ## Documento de fase
 

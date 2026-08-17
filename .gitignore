@@ -1,6 +1,7 @@
 .local/
 data/
 .venv/
+__pycache__/
 .env
 *.log
 *.sqlite
