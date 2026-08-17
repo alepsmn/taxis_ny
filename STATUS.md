@@ -1,6 +1,6 @@
 # Estado actual
 
-Última actualización: 12 de agosto de 2026.
+Última actualización: 16 de agosto de 2026.
 
 ## Fase activa
 
@@ -32,17 +32,29 @@ Diseñar desde evidencia reproducible de los Parquet reales de 2024-01 y 2025-01
 
 ## Tarea activa
 
-F1-01 — Definir el perfil mínimo reproducible.
+F1-02 — Perfilar valores de 2024-01.
 
 ## Criterio de aceptación de la tarea
 
-- Quedan definidas las métricas necesarias por columna para reconocer ambos archivos.
-- Cada métrica tiene un propósito ligado al contrato o a una regla de calidad.
-- Se incluyen tipo lógico observado, nulabilidad, extremos relevantes y cardinalidad solo cuando aporta evidencia.
-- Se define el comando previsto, pero todavía no se implementa el perfil ni el pipeline.
+- El comando versionado termina sobre `data/reference/yellow_tripdata_2024-01.parquet`.
+- Verifica que el SHA-256 de la entrada coincide con el documentado antes de perfilar.
+- Produce todas las métricas definidas en `docs/profiling.md`.
+- Conserva resultados verificables sin versionar el Parquet ni filas reales.
+- No implementa el downloader ni el pipeline productivo.
 
 ## Último resultado verificado
 
+- `scripts/profile_parquet.py` valida ruta y SHA-256 esperado antes de abrir el Parquet; un hash incorrecto deja `stdout` vacío y termina con código `1`.
+- Una entrada válida produce JSON determinista con versión de perfil, identidad, tamaño, 2.964.624 filas y 19 columnas con tipo lógico, conteo y porcentaje de `NULL`.
+- Dos ejecuciones sobre la misma entrada producen salida idéntica byte a byte.
+- `VendorID` tiene 3 valores no nulos observados (`1`, `2`, `6`) y ningún `NULL`.
+- `RatecodeID` tiene 7 valores no nulos observados (`1`, `2`, `3`, `4`, `5`, `6`, `99`) y 140.162 `NULL` (4,727817 %).
+- La consulta y transformación de frecuencias se reutilizan para `VendorID`, `RatecodeID`, `store_and_fwd_flag`, `payment_type`, `PULocationID` y `DOLocationID`.
+- `store_and_fwd_flag` presenta `NULL`, `N` y `Y`: 140.162, 2.813.126 y 11.336 filas respectivamente.
+- `payment_type` presenta 5 valores no nulos (`0` a `4`); `PULocationID`, 260; y `DOLocationID`, 261.
+- `fetch_frequency_rows` limita los identificadores dinámicos a seis columnas conocidas; el script recuperó una estructura limpia y la salida sigue siendo idéntica entre dos ejecuciones.
+- F1-01 quedó completada en `docs/profiling.md` y versionada en `44cb226`.
+- `docs/profiling.md` define las métricas comunes, por familia y cruzadas, su propósito y la interfaz prevista.
 - `yellow_tripdata_2024-01.parquet` descargado manualmente mediante `curl`.
 - Tamaño comprobado: `49,961,641` bytes.
 - SHA-256 comprobado: `c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510`.
@@ -85,7 +97,7 @@ Ninguno.
 
 ## Siguiente paso único
 
-Revisar y versionar `docs/profiling.md` y el backlog ampliado; después iniciar F1-02 con el diseño guiado de la interfaz de perfilado.
+Perfilar `passenger_count`: frecuencias, mínimo, máximo y valores negativos, reutilizando solo la transformación que corresponda.
 
 ## Documento de fase
 

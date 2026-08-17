@@ -71,6 +71,12 @@ al dominio válido. Para zonas, la pertenencia se contrastará con una versión
 identificada del catálogo; el rango numérico del ID no representa distancia ni
 proximidad geográfica.
 
+`store_and_fwd_flag` describe el modo de envío del registro, no una propiedad
+del trayecto: `Y` indica que el registro se guardó temporalmente en el vehículo
+por falta de conexión y se envió después; `N`, que no se almacenó para un envío
+posterior. Un `NULL` solo demuestra ausencia observada del dato. La semántica
+procede del [diccionario oficial de Yellow Taxi](https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf).
+
 ### Conteos discretos
 
 Para `passenger_count`:
@@ -116,18 +122,19 @@ Para cada importe:
 - Conteo y porcentaje de negativos.
 - Conteo y porcentaje de `NULL`.
 
-Para `total_amount`, además se medirá la diferencia respecto a la suma de los
-componentes que la documentación aplicable confirme. La comparación admitirá
-una tolerancia monetaria explícita para diferencias de representación de
-`DOUBLE`; la tolerancia no debe ocultar componentes ausentes ni discrepancias
-semánticas. La fórmula y el umbral quedan pendientes de confirmación.
+La reconciliación de `total_amount` no se ejecutará en F1-02. El diccionario
+oficial lo describe como el total cobrado al pasajero, sin propinas en efectivo,
+pero no documenta una igualdad exacta con las columnas de componentes. Hasta
+confirmar una fórmula y una tolerancia no se interpretará un residuo calculado
+como discrepancia ni como error de calidad.
 
 ## Comprobaciones cruzadas
 
 - Duración negativa: `dropoff < pickup`.
 - Duración cero con distancia positiva.
 - Distancia negativa o cero, segmentada por duración e importes.
-- Diferencia entre `total_amount` y componentes documentados.
+- Diferencia entre `total_amount` y componentes documentados: diferida hasta
+  confirmar una fórmula y una tolerancia.
 - Códigos categóricos observados fuera de dominios documentados.
 - IDs de zona no presentes en el catálogo versionado.
 
@@ -137,16 +144,24 @@ ni inválido solo por su frecuencia.
 
 ## Salida e interfaz previstas
 
-La implementación posterior expondrá una interfaz equivalente a:
+La implementación expondrá una interfaz equivalente a:
 
 ```bash
-uv run python scripts/profile_parquet.py data/reference/yellow_tripdata_2024-01.parquet
-uv run python scripts/profile_parquet.py data/reference/yellow_tripdata_2025-01.parquet
+uv run python scripts/profile_parquet.py \
+  data/reference/yellow_tripdata_2024-01.parquet \
+  --expected-sha256 c4d59da7bbc8abaeeeb1727947ee93d9891a71acb42854bd80db1571b2030510
 ```
 
-La salida debe ser determinista, incluir la identidad del archivo y permitir
-comparar ambos meses. El formato concreto se decidirá al comenzar F1-02. Los
-archivos Parquet y las filas reales no se versionarán.
+El SHA-256 esperado procede de `docs/reference-data.md`; no se calcula desde la
+misma entrada como supuesto valor esperado. Si no coincide, el programa no
+emite un perfil por `stdout`, escribe el diagnóstico en `stderr` y termina con
+un código distinto de cero.
+
+Una ejecución válida emite JSON determinista por `stdout`. No incluye campos
+variables como la hora de ejecución ni rutas absolutas. Las frecuencias se
+ordenan por valor, con `NULL` en una posición explícita, para mantener estable
+la comparación entre ejecuciones y meses. Los archivos Parquet y las filas
+reales no se versionarán.
 
 ## Límites
 

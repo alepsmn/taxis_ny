@@ -123,3 +123,13 @@ Cada entrada contiene:
 - **Estado:** vigente.
 - **Evidencia:** `STATUS.md`, `docs/BACKLOG.md` y commits `239d48d` y `622a009`.
 - **Promoción a ADR:** no necesaria; es una transición de fase, no una decisión arquitectónica.
+
+## 2026-08-15 — D-012 — Contrato de salida del perfil reproducible
+
+- **Contexto:** F1-02 necesita conservar resultados comparables sin confundir perfiles de revisiones distintas ni mezclar diagnósticos con datos válidos.
+- **Decisión:** el perfilador recibe un SHA-256 esperado independiente de la entrada, valida la identidad antes de perfilar y emite JSON determinista por `stdout`; los errores se escriben en `stderr` y terminan con código distinto de cero. Se excluyen campos variables y las frecuencias se ordenan por valor con una posición explícita para `NULL`.
+- **Fundamento confirmado:** el autor distinguió ruta, nombre e identidad por contenido; comprobó que un hash calculado desde la propia entrada sería una comparación tautológica y verificó los casos de éxito, formato inválido y contenido distinto.
+- **Consecuencia:** dos ejecuciones sobre los mismos bytes producen resultados comparables; un archivo distinto con el mismo nombre no genera un perfil exitoso.
+- **Estado:** vigente.
+- **Evidencia:** `scripts/profile_parquet.py`, `docs/profiling.md` y verificaciones locales del 14 y 15 de agosto de 2026.
+- **Promoción a ADR:** si el formato del perfil pasa a ser una interfaz consumida por otros componentes o requiere compatibilidad entre versiones.
