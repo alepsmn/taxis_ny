@@ -50,7 +50,6 @@ RULES = [
     {"id": "R-06", "severity": "reject", "reason": "implausible_distance", "sql": "trip_distance > 200"},
     {"id": "R-07", "severity": "reject", "reason": "negative_amount", "sql": "fare_amount < 0 OR total_amount < 0"},
     {"id": "R-08", "severity": "reject", "reason": "missing_amount", "sql": "fare_amount IS NULL OR total_amount IS NULL"},
-
     {"id": "R-09", "severity": "reject", "reason": "unknown_zone", 
     "sql": "pu_location_id NOT BETWEEN 1 AND 265 OR do_location_id NOT BETWEEN 1 AND 265 OR pu_location_id IS NULL OR do_location_id IS NULL"},
 

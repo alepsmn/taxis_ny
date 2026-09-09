@@ -92,7 +92,7 @@ Unión de todas las reglas `reject` sobre 2024-01: 37.687 filas, 1,27%.
 |---|---|---|---|---|
 | B-01 | Filas con `reasons` no vacía > 5% del total | block | `reject_ratio_exceeded` | D-09. |
 | B-02 | Filas exactamente duplicadas > 0,1% | warn | `exact_duplicates` | D-17. Métrica, no rechazo. |
-| B-03 | Algún cast de T-02 falló | block | `cast_failure` | Complementa S-02 para casos que solo se ven con los valores. |
+| B-03 | Algún cast de T-02 falló | block | `cast_failure` | Complementa S-02 para casos que solo se ven con los valores. Diferida: con `CAST` directo el proceso aborta antes de llegar a batch; implementar si se migra a `TRY_CAST`. |
 | B-04 | Corte 3: filas del mes difieren más del 50% respecto al mes anterior publicado | warn | `row_count_drift` | Detecta ficheros truncados o duplicados sin bloquear meses legítimamente atípicos (abril de 2020 existió). |
 
 ## Resumen de ejecución

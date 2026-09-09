@@ -25,7 +25,7 @@ def row_rule(result_trans: duckdb.DuckDBPyRelation,) -> duckdb.DuckDBPyRelation:
             -- cada fila tiene cols con listas de reasons [...] o warnings [...]
             list_filter([{', '.join(reject_cases)}], x -> x IS NOT NULL) AS reasons,
             list_filter([{', '.join(warn_cases)}], x -> x IS NOT NULL) AS warnings
-            FROM transformed
+        FROM transformed
     """
     )
 
