@@ -2,31 +2,26 @@ import duckdb
 from duckdb import DuckDBPyRelation
 from taxis.contract import RULES
 
-def row_rule(result_trans: duckdb.DuckDBPyRelation,) -> duckdb.DuckDBPyRelation:
-    result_trans.create_view("transformed")
 
-    reject_cases = []
-    warn_cases = []
-    for rule in RULES:
-        # {"id": "R-01", "severity": "reject", "reason": "missing_timestamp", "sql": "pickup_at IS NULL OR dropoff_at IS NULL"},
-        # {"id": "R-02", "severity": "reject", "reason": "negative_duration", "sql": "dropoff_at < pickup_at"},
-        # 1er CASE WHEN pickup_at IS NULL OR dropoff_at IS NULL THEN 'missing_timestamp' END - no hay else, si no cumple NULL
-        # 2do CASE WHEN dropoff_at < pickup_at THEN 'negative_duration' END
-        case = f"CASE WHEN {rule['sql']} THEN '{rule['reason']}' END"
-        if rule["severity"] == 'reject':
-            reject_cases.append(case)
+def validate_row_quality(transformed_cols: DuckDBPyRelation, ) -> DuckDBPyRelation:
+    reasons_rejected = []
+    reasons_warning = []
+
+    for col in RULES:
+        clause = f"CASE WHEN {col['sql']} THEN '{col['reason']}' END" #
+        if col['severity'] == 'reject':
+            reasons_rejected.append(clause)
         else:
-            warn_cases.append(case)
+            reasons_warning.append(clause)
 
-    result_rules = duckdb.sql(
+    transformed_cols.create_view('transformed')
+    validated_rows = duckdb.sql(
         f"""
-        SELECT *,
-            -- lista[NULL, 'negative_duration'] se filtra quitando aquellos que no son NULLS
-            -- cada fila tiene cols con listas de reasons [...] o warnings [...]
-            list_filter([{', '.join(reject_cases)}], x -> x IS NOT NULL) AS reasons,
-            list_filter([{', '.join(warn_cases)}], x -> x IS NOT NULL) AS warnings
+        SELECT  *,
+            list_filter([{', '.join(reasons_rejected)}], x->x IS NOT NULL) AS reasons_rejected,
+            list_filter([{', '.join(reasons_warning)}], x->x IS NOT NULL) AS reasons_warning
         FROM transformed
     """
     )
 
-    return result_rules
+    return validated_rows

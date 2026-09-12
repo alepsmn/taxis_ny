@@ -131,3 +131,27 @@ La evidencia numérica procede del Parquet 2024-01 (2.964.624 filas) y 2025-01 (
 **Por qué:** si el proceso muere a mitad de escritura, nadie debe ver una partición a medias como si fuera válida. Un rename dentro del mismo sistema de ficheros es atómico en Linux.
 **Implica:** staging vive bajo `data/` para estar en el mismo filesystem. En el corte 2 se prueba con un fallo inyectado entre escribir y renombrar.
 **Estado:** vigente.
+
+## D-19. Manifiesto de estado en SQLite
+**Decisión:** una base de datos SQLite en `data/control/manifest.db` registra cada partición publicada. Una tabla `partitions` con:
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| year | INTEGER NOT NULL | Año de la partición |
+| month | INTEGER NOT NULL | Mes de la partición |
+| sha256 | TEXT NOT NULL | Hash del fichero raw procesado |
+| contract_version | INTEGER NOT NULL | Versión del contrato aplicado |
+| row_count | INTEGER NOT NULL | Filas en el fichero raw |
+| curated_count | INTEGER NOT NULL | Filas publicadas en curated |
+| quarantine_count | INTEGER NOT NULL | Filas en quarantine |
+| published_at | TEXT NOT NULL | Timestamp ISO 8601 del momento de publicación |
+
+Clave primaria: `(year, month)`. Solo un registro activo por partición; un reprocess actualiza el registro, no añade uno nuevo.
+**Por qué:** la idempotencia a nivel de fichero (D-05) necesita saber qué se ha publicado para decidir si hay trabajo. SQLite es el motor de estado del stack (D-03), es un solo fichero copiable y consultable desde cualquier herramienta. Guardar solo el registro activo es suficiente para el corte 2; si se necesita historial de revisiones, se añade una tabla de log en un corte posterior.
+**Evidencia:** con 24 particiones mensuales (D-02), la tabla nunca superará unas decenas de filas. No hay necesidad de un motor más pesado.
+**Implica:**
+- `manifest.py` con `lookup(year, month)` y `register(...)`.
+- `ingest` consulta el manifiesto antes de procesar: mismo sha256 → skip; distinto sha256 → rechazar sin `--reprocess` (D-05: una revisión requiere aceptación explícita).
+- El INSERT/UPDATE se ejecuta **después** del rename exitoso de publish (D-18), nunca antes.
+- `--reprocess` salta la comprobación de idempotencia y actualiza el registro.
+**Estado:** **PARA DISCUTIR** — ¿guardar solo el registro activo por partición, o mantener historial de todas las versiones procesadas? Recomiendo registro activo: el historial vive en git (commits de curated) y en los JSON de resumen impresos por stdout. Una tabla de log solo añade complejidad sin consumidor claro en este corte.

@@ -5,6 +5,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 data/
+data/recreation_scripts/
 *.sqlite
 *.log
 .local/

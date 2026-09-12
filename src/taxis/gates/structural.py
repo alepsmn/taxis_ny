@@ -2,68 +2,53 @@ import duckdb
 from pathlib import Path
 from taxis.contract import CONTRACT_V1, COMPATIBLE_TYPES
 
-def comparing_schemas(parquet_path: Path) -> tuple[dict[str, str|int], int, dict[str, str]]:
-
+def get_structural_schema(raw_file_path: Path, ) -> tuple[dict[str, str], int, dict[str, str]]:
     meta_cols = {
         "block": [],
         "warn": []
     }
-    # S-04 # -------------------------------------------------------------------------
-    count = duckdb.execute(
-        """SELECT COUNT(*) FROM read_parquet(?)""",
-        [str(parquet_path)]
-    ).fetchone()[0] #  fila como TUPLA - Ej: (29438924, ) -> aunque solo una col
 
-    if count == 0:
+    row_count = duckdb.execute(
+        """
+        SELECT COUNT(*)
+        FROM read_parquet(?)
+    """, [str(raw_file_path)]
+    ).fetchone()[0] #
+
+    if row_count == 0:
         meta_cols["block"].append(
-            {
-                "rule": "S-04", "row_count": 0
-            }
+            {"id": "S-04", "reason": "empty_file"}
         )
-        return meta_cols, count
+        return meta_cols, row_count, None
 
-    # S-01 # -------------------------------------------------------------------------
+    object_schema = duckdb.execute(
+        """
+        DESCRIBE
+        SELECT *
+        FROM read_parquet(?)
+    """, [str(raw_file_path)]
+    ).fetchall()
 
-    result_schema = duckdb.execute(
-            """DESCRIBE SELECT * FROM read_parquet(?)""",
-            # antes FROM parquet_schema(?) - esquema fisico del propio parquet no de duckdb
-            [str(parquet_path)]
-        ).fetchall()
-        # name col, type data, require,  3nones for parquet
-        #[('id', 'BIGINT', 'YES', None, None, None),]
+    file_schema = {schema[0].lower(): schema[1] for schema in object_schema}
 
-            # nombre columna : tipo de dato,
-    schema = {row[0].lower(): row[1] for row in result_schema}
     for col in CONTRACT_V1:
-        source = col.source.lower()
-        # verificas que las obligatorias (del contrato) esten antes de nada
-        if source not in schema:
-            # si no esta, y es required - blocked
+        if col.source.lower() not in file_schema:
             if col.required:
                 meta_cols["block"].append(
-                    {
-                        "rule": "S-01", "column": col.source
-                    }
+                    {"id": "S-01", "reason": "missing_required_column", "column": col.source}
                 )
         else:
-            # S-02 # -------------------------------------------------------------------------
-            # Indicar el tipo obtenido y el tipo esperado
-            parquet_type = schema[source]
-            if parquet_type != col.type and (parquet_type, col.type) not in COMPATIBLE_TYPES:
+            parquet_type = file_schema[col.source.lower()]
+            if col.type != parquet_type and (parquet_type, col.type) not in COMPATIBLE_TYPES:
                 meta_cols["block"].append(
-                    {
-                        "rule": "S-02", "column": col.canonical,
-                        "expected": col.type, "got": parquet_type
-                    }
+                    {"id": "S-02", "reason": "incompatible_type", "column": col.canonical, "expected": col.type, "got": parquet_type}
                 )
-    # S-03 # -------------------------------------------------------------------------
-    contract_sources = {c.source.lower() for c in CONTRACT_V1}
-    for name in schema:
-        if name not in contract_sources:
+
+    expected_cols = {obj.source.lower() for obj in CONTRACT_V1}
+    for col in file_schema:
+        if col not in expected_cols:
             meta_cols["warn"].append(
-                {
-                    "rule": "S-03", "unknown_column": name
-                }
+                {"id": "S-03", "reason": "unknown_column", "column": col}
             )
 
-    return meta_cols, count, schema
+    return meta_cols, row_count, file_schema

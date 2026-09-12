@@ -46,7 +46,7 @@ Etapas, en este orden:
 Mapeo con tu minimotor anterior: missing fields y conversión de tipos = puerta estructural; validación semántica = puertas de fila; tu lista de transformaciones = T-xx; tu clase filtro = la puerta de lote.
 
 ### Corte 2: estado e idempotencia
-SQLite con un manifiesto por partición y versión (D-06). Repetir el mismo mes con el mismo hash es un no-op. Publicación atómica verificada con fallo inyectado. `--reprocess` explícito.
+SQLite con un manifiesto por partición y versión (D-19). Repetir el mismo mes con el mismo hash es un no-op. Publicación atómica verificada con fallo inyectado. `--reprocess` explícito.
 
 ### Corte 3: incremental, backfill y evolución de esquema
 `plan` calcula qué meses faltan entre dos fechas. Procesar 2025-01 con `cbd_congestion_fee` sin tocar 2024. Backfill reanudable. Cambio de contrato bloquea la publicación cuando es incompatible.
@@ -94,19 +94,25 @@ Los directorios aparecen cuando existe código que los necesita.
 - `cli.py`: Typer, encadena acquire → structural → JSON resumen → exit code 2 si block.
 - Probado con 2024-01 y 2025-01: hashes y row counts coinciden con D-05.
 
-**Tarea 2 (corte 1, etapas 3 y 4): transformaciones y reglas de fila.** En progreso.
+**Tarea 2 (corte 1, etapas 3 y 4): transformaciones y reglas de fila.** ✓
 - `transforms.py`: T-01..T-05 en una sola consulta SQL (subconsulta para renombrar/castear, externa para duration y linaje). Usa `duckdb.sql()` para devolver `DuckDBPyRelation`.
 - `gates/rows.py`: `row_rule()` — evalúa R-01..R-19 con `CASE WHEN` por regla, produce `reasons` (reject) y `warnings` (warn) como listas por fila via `list_filter`. Registra la relación como vista con `.create_view("transformed")`.
 
+**Tarea 3 (corte 1, etapas 5 y 6): batch, publicación y resumen completo.** ✓
+- `gates/batch.py`: `batch_door()` — B-01 (ratio rejects > 5% → block), B-02 (duplicados exactos > 0,1% → warn). Separa curated (reasons vacía) y quarantine (reasons no vacía). Conteo por reason_code con UNNEST.
+- `publish.py`: `publication_parquet()` — staging temporal + `replace()` atómico (D-18). `ParquetNoEscrito` si falla la escritura.
+- `cli.py`: cadena completa acquire → structural → transform → rows → batch → publish. JSON resumen por stdout con month, sha256, row_count, gates, curated/quarantine counts, rejected/warning counts.
+- Tests diferidos.
+
 ## Siguiente tarea
 
-**Tarea 3 (corte 1, etapas 5 y 6): batch, publicación y resumen completo.**
+**Tarea 4 (corte 2): manifiesto SQLite e idempotencia.**
 
-Entregable: `uv run taxis 2024-01 data/reference/yellow_tripdata_2024-01.parquet` produce curated y quarantine en disco, con un JSON resumen completo.
+Entregable: ejecutar `uv run taxis 2024-01 ...` dos veces consecutivas; la segunda es un no-op con mensaje. `uv run taxis --reprocess 2024-01 ...` fuerza el reprocesamiento.
 
 Lo que falta:
-1. Separar curated (reasons vacía) y quarantine (reasons no vacía) a partir del resultado de `row_rule`.
-2. `gates/batch.py`: B-01 (ratio rejects > 5% → block), B-02 (duplicados exactos > 0,1% → warn), B-03 (cast failure → block).
-3. `publish.py`: escribir curated y quarantine en staging, rename atómico al destino (`data/curated/year=YYYY/month=MM/`, `data/quarantine/year=YYYY/month=MM/`). D-18.
-4. Actualizar el JSON resumen con: filas curated, filas quarantine, conteo por reason_code (reject y warn), resultado de B-xx.
-5. Tests.
+1. `manifest.py`: crear `data/control/manifest.db` con tabla `partitions` (D-19). Funciones: `lookup(year, month)` → registro o None, `register(year, month, sha256, summary)` → INSERT o UPDATE.
+2. En `cli.py`, antes de procesar: consultar manifiesto. Mismo (year, month, sha256) ya publicado → skip con mensaje. Distinto sha256 para el mismo mes → avisar de revisión y rechazar sin `--reprocess` (D-05).
+3. En `cli.py`, después de publish exitoso: registrar en manifiesto. El INSERT va después del rename, nunca antes (D-18).
+4. Flag `--reprocess` en el comando `ingest`: salta la comprobación de idempotencia y actualiza el registro del manifiesto.
+5. Publicación atómica verificada con fallo inyectado — diferida con tests.
