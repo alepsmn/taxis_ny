@@ -3,7 +3,6 @@ from dateutil.relativedelta import relativedelta
 from pathlib import Path
 from taxis.manifest import lookup_published
 
-
 def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict[str, str]:
     ini_date = datetime.strptime(date_from, "%Y-%m")
     end_date = datetime.strptime(date_to, "%Y-%m")
@@ -33,7 +32,6 @@ def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict
             )
         actual_date += relativedelta(months=1)
 
-    
     return {
         "range": {
             "from": f"{date_from}", "to": f"{date_to}"
@@ -42,14 +40,3 @@ def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict
         "published": published_tasks,
         "pending": pending_tasks
     }
-
-
-# Intento de reconstruccion
-# def missing_processed_files(date_from, date_to, db_path):
-#     ini_date = datetime.strptime(date_from, "%Y-%m")
-#     end_date = datetime.strptime(date_to, "%Y-%m")
-
-#     actual_date = ini_date
-
-#     while actual_date <= end_date:
-#         actual_date += relativedelta(months=1)

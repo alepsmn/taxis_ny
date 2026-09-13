@@ -97,4 +97,3 @@ def batch_gate(validated_rows: DuckDBPyRelation, row_count: int) -> tuple[dict[s
         )
 
     return meta_batch, curated_rows, quarantine_rows, total_curated, total_quarantine, reasons_rejected_count, reasons_warning_count
-    #     return meta_batch, curated, quarantine, total_curated, total_quarantine, rejected_count, warning_count

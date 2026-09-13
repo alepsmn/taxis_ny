@@ -2,7 +2,6 @@ import duckdb
 from duckdb import DuckDBPyRelation
 from taxis.contract import RULES
 
-
 def validate_row_quality(transformed_cols: DuckDBPyRelation, ) -> DuckDBPyRelation:
     reasons_rejected = []
     reasons_warning = []

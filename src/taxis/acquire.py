@@ -16,7 +16,6 @@ def get_sha56(source_path: Path) -> str:
 
         return hasher.hexdigest()
 
-
 def get_file(source_path: Path, raw_base_path: Path, year: int, month: int) -> tuple[str, Path]:
     file_sha = get_sha56(source_path)
     raw_file_path = raw_base_path / f"year={year}" / f"month={month:02d}" / f"{file_sha}.parquet"

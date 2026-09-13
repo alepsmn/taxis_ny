@@ -58,7 +58,7 @@ def register(db_path: Path, year: int, month: int, sha: str, contract_version: i
     conn = sqlite3.connect(str(db_path))
     conn.execute(
         """
-        INSERT INTO partitions (year, month, sha256, contract_version, row_count, curated_count, quarantine_count, published_at)
+        INSERT OR REPLACE INTO partitions (year, month, sha256, contract_version, row_count, curated_count, quarantine_count, published_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (year, month, sha , contract_version, row_count, curated_count, quarantine_count, published_at)
     )

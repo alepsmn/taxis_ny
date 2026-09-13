@@ -72,7 +72,7 @@ La evidencia numérica procede del Parquet 2024-01 (2.964.624 filas) y 2025-01 (
 ## D-10. El "bloque nulo" se conserva
 **Decisión:** las filas en las que `passenger_count`, `RatecodeID`, `store_and_fwd_flag`, `congestion_surcharge` y `Airport_fee` son NULL a la vez se publican en curated con warn, no se rechazan.
 **Por qué:** son registros enviados sin los campos extendidos, casi seguro por un proveedor o un canal concreto. Los campos que importan para un viaje (timestamps, zonas, importes) están presentes y son coherentes. Rechazarlos sesgaría cualquier agregado de ingresos.
-**Evidencia:** 140.162 filas (4,73%) en 2024-01, exactamente las mismas filas en las cinco columnas, y las mismas que tienen `payment_type = 0`. En 2025-01 el patrón se repite: 540.149 filas (15,5%), lo que confirma que es sistemático y creciente. Si se rechazaran, 2025-01 superaría el umbral de bloqueo.
+**Evidencia:** 140.162 filas (4,73%) en 2024-01, exactamente las mismas filas en las cinco columnas, y las mismas que tienen `payment_type = 0`. En 2025-01 procesado (fichero descargado ago-2026, sha `9af277e4`): 85.030 filas con `payment_type = 0` (2,45%), muy por debajo de la cifra de 540.149 (15,5%) del perfilado anterior sobre `taxis_ny`. El fichero de TLC fue republicado entre ambas descargas; la evidencia actual manda. El patrón sigue siendo sistemático pero menor que en 2024-01.
 **Implica:** R-11, R-13, R-14 son `warn`. `payment_type = 0` se conserva como código; el catálogo lo etiqueta "desconocido".
 **Estado:** vigente.
 
@@ -155,3 +155,17 @@ Clave primaria: `(year, month)`. Solo un registro activo por partición; un repr
 - El INSERT/UPDATE se ejecuta **después** del rename exitoso de publish (D-18), nunca antes.
 - `--reprocess` salta la comprobación de idempotencia y actualiza el registro.
 **Estado:** **PARA DISCUTIR** — ¿guardar solo el registro activo por partición, o mantener historial de todas las versiones procesadas? Recomiendo registro activo: el historial vive en git (commits de curated) y en los JSON de resumen impresos por stdout. Una tabla de log solo añade complejidad sin consumidor claro en este corte.
+
+## D-20. El origen añade columnas `month` y `year` a partir de 2025
+**Decisión:** las columnas `month` y `year` que aparecen en el fichero de 2025-01 se descartan con warn (S-03). No se añaden al contrato.
+**Por qué:** son redundantes con la clave de partición, que se toma del nombre del fichero (D-04). Incorporarlas al contrato no aporta información nueva y crearía ambigüedad si el valor de la columna no coincide con la partición.
+**Evidencia:** 2024-01 tiene 19 columnas; 2025-01 tiene 22 (las 20 del contrato v1 más `month` y `year`). S-03 las detecta y descarta correctamente.
+**Implica:** no hay cambio en código. Si en el futuro más columnas nuevas aparecen, se evalúan una a una.
+**Estado:** vigente.
+
+## D-21. Salto en `negative_amount` entre 2024-01 y 2025-01
+**Decisión:** se registra como observación. No se cambia la regla R-07 ni el umbral de B-01.
+**Por qué:** `negative_amount` (R-07) pasa de 37.448 rejects (1,26%) en 2024-01 a 144.439 (4,16%) en 2025-01. El ratio de rechazo total sube de 1,27% a 4,16%, todavía bajo el 5% de B-01 pero con margen muy reducido. Si la tendencia continúa en 2025-02, B-01 podría bloquear. Antes de cambiar el umbral conviene ver si es un patrón estable o un pico puntual.
+**Evidencia:** resumen JSON de `ingest 2025-01`: 144.703 quarantine / 3.475.226 total = 4,16%.
+**Implica:** vigilar los próximos meses. B-04 (row_count_drift, pendiente de implementar) ayudará a detectar estos saltos automáticamente. Si 2025-02 supera el 5%, se abre decisión sobre recalibrar B-01.
+**Estado:** vigente.

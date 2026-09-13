@@ -1,84 +1,214 @@
-El pipeline comienza desde cli.py. Se espera la ruta de un .parquet, descargado manualmente, con fecha 2024-01, tal que, mediante un Typer() se obtengan sus tipos para su
-procesamiento.
-
-acquire.py
-La ruta y de los elementos de la fecha (year, month) se pasan a la funcion acquire, del modulo indicado, junto con la ruta base del destino donde se colocara el archivo.
-Para ello, se calcula el hash sha256, y mediante esta serie de elementos se formara la ruta final, cuyo archivo/s seran nombrados mediante su sha256, pasandolo de la ruta
-donde se descargo a esta (shutil.copy2). La clave sha256 y la ruta creada, se devolveran para el futuro
-
-structural.py
-Este archivo contiene la funcion **comparing_schemas**, para comprobar si:
-- S-04 el Fichero tiene alguna fila (COUNT(*)), si esta vacio, se descarta - block. Para comparar los esquemas, se extraen mediante consultas SQL-duckdb (DESCRIBE) y se procesan para compararlas con el conjunto de esquemas que contienen los objetos dataclass para cada columna. 
-- Se comprueba la pertenencia de estos objetos en el esquema obtenido, si no existen y se comprueba su obligatoriedad, se bloquean. S-01 - block
-- Se comprueba la compatibilidad de los tipos existentes en el esquema (con una estructura que almacena tipos compatibles entre
-    ficheros y el motor duckdb/sql) y los esperados por los objetos. Fallo, S-02 - block.
-- Se comprueba columnas existentes en el esquema obtenido pero no en los objetos CONTRATO, si no existen - warn - para valorar si anadirlas
-
-Los avisos se guardan en un dict: **meta(data)_cols**, se envian el **numero de filas** y el **esquema del documento** para su posteior procesamiento
-
-Desde cli.py, si existen razones para **block** (S-01, S-02 o S-03) se detiene el programa avisando por consola de los fallos encontrados en esta primera puerta de inspeccion
-
-transform.py
-La ruta final creada desde acquire.py, el sha, el ano, mes y schema obtenidos, son usados por la **funcion transform** para realizar las siguientes transformaciones a dicho esquema / columnas
-Se recorren las columnas de los objetos del contrato, si estas, pertenecen al contrato, se CASTEA mediante tipos equivalentes (indicada por la estructura correspondiente)
-y se les asigna un nombre canonico (cambiando el nombre source). Si la columna no  pertenece al objeto contrato, se indica como NULL::(AS type) AS nombre.
-Este recorrido almacena las sentencias select como f str donde se incluyen los elementos individuales para cada columna y posteriormente se unen mendiante un join, tal que se forme una unica sentencia select de elementos str y se pase como f str al select de la query. (T-01 a T-03)
-En dicha query se anadiran tambien: duration_min - como datediff de los dos eventos pick_up y drop_off(T-04 ), y los columnas de linaje para cada fila(T-05):
-    - source_sha256 como sha, source_year/month, contract-version, y ingested_at como  CURRENT TIMESTAMP 
-
-Al ejecutarse como duckdb.sql, se obtiene un objeto DuckDBPyRelation que contendra estas transformaciones.
-
-rows.py
-A partir del dict que contiene todas las reglas que se aplicaran a todas las filas, se filtraran para dividirse posteriormente entre curated/quarantine. Esta estructura
-contiene la condicion sql, la razon de para rechazar la fila o avisar y la senal de rejected/warn
-La funcion itera sobre la estructura de reglas, y comprueba si la severidad es reject/warn para anadir la sentencia como f-str de CASE  WHEN {relga.sql} THEN {regla.reason} END
-Para juntarlas y hacer dos listas de reglas para cada tipo de severidad. Mediante list_filter([(', ').join(a)], x->x IS NOT NULL) AS reject/warn, cada regla
-que la fila supere, se anadira como un NULL, si supera todas, se eliminan los nulls y la lista de razones queda vacia. Se terminan anadiendo dos listas de razones r/w
-y se obtiene otro objeto DuckDBPyRelation que manipular posteriormente.
-
-batch.py
-La funcion batch_gate obtiene el objeto duckdb anterior, para realizar la puerta de validacion para el lote. 
-- B-01: Comenzara comprobando el ratio de filas rechazadas(aquellas cuyas razones de block no sean nulas) 
-    Obtiene todas las filas rechazadas y las compara con el total de filas del fichero. Si se supera el 5%, el FICHERO se descarta.
-- B-02: las filas exactamente duplicadas se obtienen al agrupar a todos las columnas que se quieran verificar que no repiten valor (al agrupar por todos los campos posibles,
-para que una fila sea exactamente duplicada, debe compartir los valores de todos esos campos, por lo que solo habria que verificar si el COUNT(*) de los grupos es mayor a 1 HAVING) - subquery
-A la query superior le llega este conteo por con los grupos duplicados y cuantas filas duplicadas por grupo, para saber el valor exacto, es necesario restar: TOTAL FILA DUPLICADAS (sum del count) - COUNT() de los grupos actuales (count en la query superior) COALESCE 0 para evitar error por NULLS si no hubiera duplicados
-Si estas filas duplicadas superan al 0.1%, se avisa con un warn (no impide el avance)
-
-Los fallos se registran en meta(data)_batch como block/warn
-
-------- Otras cosas que hace la f. - separar
-Obtiene los objetos para curated, quarantine, junto con la cantidad de filas de ambos.
-Curated contiene todas las  filas donde NO HAY avisos por rejected provenientes de las reglas de rows.py
-Quarantine tiene al menos UNA RAZON por rejected
-
-Se obtienen el conteo de cada razon (rejected/warning) a partir de rows_ruled (aplicadas las reglas)
-Se hace UNNEST (cols) AS t(col) y se agrupa por col (asi cada razon agrupa a las filas que la contengan) y se
-procede a su conteo.
-Esto servira para metadata para **OBSERVABILIDAD** 
-
-Si tras la puerta, se cumple alguna condicion block, el proceso se detiene y avisa por consola de los fallos encontrados
-
-publish.py
-Los objetos curated, quarantine se guardan en un dict junto a otros datos para ser publicados.
-La funcion publish, crea una ruta temporal y escribe el parquet, si el proceso termina, inmediatamente se hace replace de la
-ruta temporal con la ruta final (donde realmente viviran los datos procesados) todo esto en un proceso try, que captura
-fallo de escritura - ParquetNoEscrito, lacual avisa por mensaje el bloque qno se ha escrito (curated o quarantine y su fecha) 
-podria enviarse a una Deadletterqueue - fallo de infra, ha pasado ya toda validacion hasta corte 1. Si el temp se creo, se borra en la excepcion
-para evitar mas fallos.
-
-Si el proceso funciona, se comprueba medianta la existencia del archivo,el cual se devuelve (ahora devolvere True si acierta,)
-
-Finalmente se informa de la metadata creada en el proceso:
-    Fecha
-    sha256
-    total filas
-    meta_cols
-    total curadas
-    total cuarentena
-    rechazadas
-    con aviso
-
 COMO CAMBIAR EXPRESIONES DE DUCKDB A SQL "PURO":
 - En rows.py: validated_rows - list_filter([{', '.join(a)}], x->x IS NOT NULL)
 - En batch.py: batch_gate - UNNEST
+
+**APP INGEST**
+
+Toma desde consola los argumentos necesarios para recorrer el pipeline. Se informa del resultado unico de cada ingesta
+y de sus excepciones en caso de fallo.
+
+***Pipeline.py***
+*run_ingest*
+Parametros
+date: str - la fecha de un archivo (YYYY-MM)
+source_path: Path - ruta del archivo
+reprocess: bool = False - ignora o no la comprobacion de la existencia del archivo (por su SHA256)
+db_path: Path = Path('data/control/manifest.db) - ruta default del manifest (metadatos de un archivo escrito)
+Devuelve:
+metadatos recopilados (dict: date, file_sha, row_count, metadata_cols, tota_curated, total_quarantine, reasons_rejected_count, reasons_warning_count)
+
+Se obtienen year,month por split de date, el sha y la ruta donde se encuentra el archivo identificado (sha.parquet) *get_file()*
+Si reprocess no esta activo, se busca si el archivo esta registrado por su sha *lookup()*.
+Comprobacion secuencial (if, if):
+- si esta y coincide con el recien calculado, se avisa para que la funcion que encapsula decida
+- si no es None: se avisa de que se intenta una revision (existe un sha para esa fecha pero no coinciden)
+
+Mediante la ruta del archivo identificado (raw_file_path), con *get_structural_schema* se obtienen: metadatos respecto a cada
+columna del esquema, el conteo total de filas y el propio esquema (dict[str, str]) al comprobar si las columnas pasan los
+requerimientos estructuales. Si se da alguna razon de bloqueo, se levanta *FileBlocked* como excepcion, para su captura en niveles superiores.
+
+El esquema obtenido, sirve de partida para hacer las transformaciones necesarias de dominio *col_transformations*, y a partir de este objeto
+DuckDBPyRelation, se pasa a *validate_row_quality*  para validar la calidad de la estructura obtenida y dar otro objeto DuckDB.
+
+Las filas validadas y el conteo total, sirven para verificar la puerta batch *batch_gate*, de donde se obtendran finalmente los datos necesarios para
+la observabilidad y los datos divididos en curated y quarantine (objetos que cumplen ciertas condiciones). Si de los metadatos de esta puerte se obtienen bloqueos, se llama a *FileBlocked* para su captura posterior.
+
+Los objetos obtenidos, se encolan para ir publicandolos, y obtener sus rutas formadas desde *publish*, las cuales serviran como comprobacion
+de que no hubo problemas al escribirlos, y asi, proceder con la escritura de sus metadatos, los cuales se accederan para realizar comprobaciones de existencia
+mas rapida sin recurrir a los propios datos
+
+***acquire.py***
+*get_file*
+Parametros:
+source_path: str - ruta del archivo origen
+raw_base_path: str - ruta base donde se esrcibria el sha.parquet
+year: ano del archivo
+month: mes del archivo
+Devuelve:
+file_sha, raw_file_path
+
+Se calcula el file_sha del archivo actual para renombrar el original e identificarlo por este. Se crea la ruta final (raw_file_path) para materializar
+la ruta padre que albergara el archivo por reemplazo (shutil.copy2)
+
+***manifest.py***
+*ensure_schema*
+Parametros:
+db_path: str - ruta del manifest.db
+
+CREATE TABLE IF NOT EXISTS tabla - para ser usada en las funciones que puedan ir antes de crear la tabla de metadatos del fichero
+mediante conexiones sqlite3.connect()
+
+*lookup*
+Parametros:
+db_path: Path
+year: int
+month: int
+
+Devuelve sha[0]: str contiene el sha del archivo ya publicado en la bbdd
+
+*lookup_published*
+Parametros
+db_path: Path
+year: int
+month: int
+
+Devuelve todas las filas y sus valores para el ano y mes dados.
+se usa conn.row_factory = sqlite3.Row para devolver los resultados en objeto Row (acceso por claves / indices)
+
+*register*
+Parametros:
+db_path: Path
+year: int
+month: int
+sha: str
+contract_version: int
+row_count: int - Filas totales encontradas
+curated_count: int
+quarantine_count: int
+published_at: str - timestamp tomada justo antes de publicar los metadatos pasados como parametros
+
+INSERT OR REPLACE tabla (valores,....) publica en manifest.db los metadatos para el fichero indicado
+
+***structural.py***
+*get_structural_schema*
+Parametros:
+raw_file_path: Path
+
+Devuelve:
+metadata_cols: dict[str, str] - contiene avisos de block o warn para su posterior comprobacion
+row_count: int - numero de filas en el fichero
+file_schema: dict[str, str] - esquema de datos del fichero {columna_minusculas:tipo dato}
+
+Comprueba y registra en metadata_cols, las razones para bloquear o avisar del avance del proceso del esquema
+de las columnas. Por simplicidad (desde duckdb):
+- Se verifica S-04: si el archivo esta vacio por conteo de sus filas - empty_file
+- Se verifica S-01: si una columna obligatoria por el contrato, esta ausente (contract - esquema)
+- Se verifica S-02: si los tipos del fichero son compatibles con los indicados para su conversion por el contrato
+- Se verifica S-03: si alguna columna extra del esquema no se encuentra en el contrato (esquema - contract)
+
+***transforms.py***
+*col_transformations*
+Parametros:
+raw_file_path: str - 
+file_schema: dict[str, str] - esquema en forma de dict columna-datatype
+file_sha: str
+year: int
+month: int
+
+Devuelve:
+Objeto DuckDB conteniendo las columnas modificadas
+
+Aplica la serie de transformaciones T-01 a T-04: renombrado, casteo al tipo correcto, si alguna columna no existente
+en el contrato es encontrada, se agrega como NULL, linaje (datediff('minute', pickup_at, dropoff_at)), sha, year, month,
+contract_version, CURRENT_TIMESTAMP
+
+***rows.py***
+*validate_row_quality*
+Parametros: 
+transformed_cols: DuckDBPyRelation
+
+Devuelve
+validated_rows: DuckDBPyRelation
+
+Aplica las 19 reglas a cada fila, dividiendo las tareas entre la severidad (block, warn). Si alguna se incumple, 
+se agrega a la lista de su columna correspondiente mediante. list_filter([{', '.join(clauses)}], x -> x IS NOT NULL)
+
+***batch.py***
+*batch_gate*
+Parametros:
+validated_rows: DuckDB
+row_count: int
+
+Devuelve:
+meta_batch: dict[str, str] - dict con las razones de warn y blocked
+curated_rows: DuckDB
+quarantine_rows: DuckDB
+total_curated: int
+total_quarantine: int
+reasons_rejected_count: dict[str, str] - cada razon de block o warning y su conteo
+reasons_warning_count: dict[str, str]
+
+Se aplican las comprobaciones de lote B-01 y B-02.
+Para B-01 es necesario obtener el numero de filas en los datos en quarantine *curated_quarantine*, tal que si el ratio respecto al total de filas es superior al 5%,
+el lote deja de ser valido y se notifica para su observacion.
+Para B-02 es necesario comparar el numero de filas exactamente duplicadas (group by por todas las columnas a comparar y todas ellas en select) Si es mayor al 0.1%,
+se emite un aviso no bloqueante.
+
+*curated_quarantine*
+Parametros:
+validated_rows: DuckDB
+
+Devuelve:
+
+curated_rows: Duck
+quarantine_rows: Duck
+total_curated: int
+total_quarantine: int
+
+Para curated y quarantine rows, se hacen dos queries donde se evalua la len de la columna que contiene las razones de reject
+Si es = 0 (curated), si es > 0 (quarantine) El total de cada una se hace por un count
+
+*reasons_count*
+Parametros:
+
+Devuelve:
+reasons_rejected_count: dict[str str] - razones reject y su conteo total
+reasons_warning_count: dict[str, str] - razones warning y su conteo
+
+Mediante UNNEST de las listas en las columnas reasons_rejected y reasons_warning, se desempaqueta para dar lugar 
+a tuplas de (razon, conteo), las cuales se pasan a formato dict con un list_comprehension
+
+***publish.py***
+*publish*
+Parametros:
+rows: Duck - contiene las filas curated/quarantine/... 
+type_rows: str - indica el tipo de filas (rows)
+year: int
+month: int
+
+Devuelve:
+final_path: Path - donde se ha escrito las el grupo de filas
+
+Se crea un path temporal donde se escribira el contenido de rows, una vez completado, se hara replace del dir temporal,
+con el final formado a partir de type_rows y las fechas (type_rows.parquet) Si el archivo existe, se devuelve su ruta entera,
+si no False. Puede ocurrir algun error al escribir, por loque se captura con ParquetNoEscrito, y si el dir temporal se llego a formar,
+se borra.
+
+***plan.py***
+*missing_processed_files*
+Parametros
+date_from: str - fecha de inicio de la comprobacion de metadatos
+date_to: str - fecha fin
+db_path: Path - dir del archivo manifest.db que sera consultado
+
+Devuelve:
+Dict con los metadatos extraidos
+
+A partir de las fechas indicadas, se consultara la existencia de metadatos de los ficheros que deberian existir entre este
+intervalo de tiempo. Por cada paso en el intervalo (1 mes) se ira contando para tener track. Si el fichero devuelve metadatos vacio,
+es porq esta pendiente de ser publicado. Este filtro se da gracias a las propias fechas (WHERE year=? AND month=?)
+
+Para facilitar el manejo de fechas se usa datetime.strptime(date_from, "%Y-%m")
+Para cada iteracion se usa actual_date += relativedelta(months=1) pasando asi cada mes mientras actual_date < end_date
+
+Se llama desde cli mediante la funcion decorada plan
