@@ -8,11 +8,20 @@ from taxis.transforms import col_transformations
 from taxis.gates.rows import validate_row_quality
 from taxis.gates.batch import batch_gate
 from taxis.publish import publish
+
+from taxis.plan import missing_processed_files
+
 from taxis.exceptions import ParquetNoEscrito
 from datetime import datetime, timezone
 
 
 app = typer.Typer()
+
+# uv run taxis plan
+@app.command()
+def plan(date_from: str = "2024-01", date_to: str = "2025-12", db_path: Path = Path('data/control/manifest.db')):
+    result = missing_processed_files(date_from, date_to, db_path)
+    print(json.dumps(result, indent=2))
 
 # acquire → structural → transforms → rows → batch → publish.
 # uv run taxis 2024-01 data/reference/yellow_tripdata_2024-01.parquet

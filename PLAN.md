@@ -104,15 +104,22 @@ Los directorios aparecen cuando existe código que los necesita.
 - `cli.py`: cadena completa acquire → structural → transform → rows → batch → publish. JSON resumen por stdout con month, sha256, row_count, gates, curated/quarantine counts, rejected/warning counts.
 - Tests diferidos.
 
+**Tarea 4 (corte 2): manifiesto SQLite e idempotencia.** ✓
+- `manifest.py`: `lookup(db_path, year, month)` → sha256 o None; `register(...)` → INSERT con CREATE TABLE IF NOT EXISTS en ambas funciones. DB en `data/control/manifest.db` (D-19).
+- `cli.py`: lookup después de acquire; mismo sha → skip con exit 0; distinto sha → aviso de revisión con exit 1 (D-05).
+- `cli.py`: register después de publish exitoso (`if all(written_paths)`), con timestamp UTC (D-18).
+- Flag `--reprocess`: salta la comprobación de idempotencia.
+- Publicación atómica verificada con fallo inyectado — diferida con tests.
+
 ## Siguiente tarea
 
-**Tarea 4 (corte 2): manifiesto SQLite e idempotencia.**
+**Tarea 5 (corte 3): incremental y backfill.**
 
-Entregable: ejecutar `uv run taxis 2024-01 ...` dos veces consecutivas; la segunda es un no-op con mensaje. `uv run taxis --reprocess 2024-01 ...` fuerza el reprocesamiento.
+Entregable: un comando `plan` que calcula qué meses faltan entre dos fechas consultando el manifiesto, y procesamiento de 2025-01 (con `cbd_congestion_fee`) sin tocar 2024-01.
 
 Lo que falta:
-1. `manifest.py`: crear `data/control/manifest.db` con tabla `partitions` (D-19). Funciones: `lookup(year, month)` → registro o None, `register(year, month, sha256, summary)` → INSERT o UPDATE.
-2. En `cli.py`, antes de procesar: consultar manifiesto. Mismo (year, month, sha256) ya publicado → skip con mensaje. Distinto sha256 para el mismo mes → avisar de revisión y rechazar sin `--reprocess` (D-05).
-3. En `cli.py`, después de publish exitoso: registrar en manifiesto. El INSERT va después del rename, nunca antes (D-18).
-4. Flag `--reprocess` en el comando `ingest`: salta la comprobación de idempotencia y actualiza el registro del manifiesto.
-5. Publicación atómica verificada con fallo inyectado — diferida con tests.
+1. Comando `plan` en cli.py: recibe rango de fechas (por defecto 2024-01 a 2025-12, D-02), consulta el manifiesto, lista los meses pendientes.
+2. Procesar 2025-01 con el contrato actual: `cbd_congestion_fee` existe en el fichero, las columnas opcionales ya se manejan (T-03, D-16).
+3. Backfill reanudable: si se interrumpe a mitad de un rango, los meses ya publicados se saltan por idempotencia.
+4. B-04 (warn): si las filas del mes difieren más del 50% respecto al mes anterior publicado en el manifiesto → `row_count_drift`.
+5. Evolución de esquema: si el contrato cambia, bloquear publicación cuando es incompatible con particiones ya publicadas.
