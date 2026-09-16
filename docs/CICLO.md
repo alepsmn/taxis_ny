@@ -7,6 +7,31 @@ COMO CAMBIAR EXPRESIONES DE DUCKDB A SQL "PURO":
 Toma desde consola los argumentos necesarios para recorrer el pipeline. Se informa del resultado unico de cada ingesta
 y de sus excepciones en caso de fallo.
 
+***cli.py***
+Consta de 3 procesos
+- *ingest*: 
+Parametros:
+date: str
+source_file: Optional[Path] = None
+reprocess: bool = False
+download_flag: bool = typer.Option(False, "--download")
+db_path: Path = Path('data/control/manifest.db')
+
+Comienza validando argumentos criticos:
+- Presencia de source_file y download_flag. Si ambos existen -> SystemExist(1) (Incompatibles)
+- Ausencia de source_file y download_flag. Si ninguno -> SystemExist(1) (Se necesita uno)
+
+Se comprueba la presencia de download_flag, si existe, se parsea date, para pasar a *download* sus
+argumentos necesarios, del cual se recibe el final_path (sha.parquet) que se nombra como SOURCE_FILE
+tal que si no existe esta flag, el nombre concuerde durante la funcion (si se obtiene un None el proceso
+de la API fue 404)
+
+El source_path obtenido por download o por argumento, se pasa a *run_ingest* del cual se obtendra los
+resultados de los metadatos del proceso para ese fichero, descargado o existente (pasado por arg)
+
+Las excepciones capturadas son FileBlock (SystemExit(2)) y ParquetNoEscrito (SystemExit(3))
+
+
 ***Pipeline.py***
 *run_ingest*
 Parametros
@@ -36,19 +61,6 @@ la observabilidad y los datos divididos en curated y quarantine (objetos que cum
 Los objetos obtenidos, se encolan para ir publicandolos, y obtener sus rutas formadas desde *publish*, las cuales serviran como comprobacion
 de que no hubo problemas al escribirlos, y asi, proceder con la escritura de sus metadatos, los cuales se accederan para realizar comprobaciones de existencia
 mas rapida sin recurrir a los propios datos
-
-***acquire.py***
-*get_file*
-Parametros:
-source_path: str - ruta del archivo origen
-raw_base_path: str - ruta base donde se esrcibria el sha.parquet
-year: ano del archivo
-month: mes del archivo
-Devuelve:
-file_sha, raw_file_path
-
-Se calcula el file_sha del archivo actual para renombrar el original e identificarlo por este. Se crea la ruta final (raw_file_path) para materializar
-la ruta padre que albergara el archivo por reemplazo (shutil.copy2)
 
 ***manifest.py***
 *ensure_schema*

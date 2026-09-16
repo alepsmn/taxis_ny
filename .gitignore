@@ -9,3 +9,4 @@ data/recreation_scripts/
 *.sqlite
 *.log
 .local/
+recreacion/

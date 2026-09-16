@@ -11,6 +11,6 @@ class FileBlocked(Exception):
         self.metadata_cols = metadata_cols
         self.type_block = type_block
         self.year = year
-        self.year = month
+        self.month = month
         mensaje = f"Status: blocked. Type: {type_block}. Cause: {metadata_cols['block']}. Date: {year}-{month}"
         super().__init__(mensaje)

@@ -38,6 +38,18 @@ def lookup(db_path: Path, year: int, month: int) -> str:
 
     return sha[0] if sha else None
 
+def register(db_path: Path, year: int, month: int, sha: str, contract_version: int, row_count: int, curated_count: int, quarantine_count: int, published_at: str):
+    ensure_schema(db_path)
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO partitions (year, month, sha256, contract_version, row_count, curated_count, quarantine_count, published_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (year, month, sha , contract_version, row_count, curated_count, quarantine_count, published_at)
+    )
+    conn.commit()
+    conn.close()
+
 def lookup_published(db_path: Path, year: int, month: int) -> sqlite3.Row:
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row # ahora devuelve obj Row ~ dict (acceso por claves)
@@ -52,15 +64,3 @@ def lookup_published(db_path: Path, year: int, month: int) -> sqlite3.Row:
     conn.close()
 
     return published
-
-def register(db_path: Path, year: int, month: int, sha: str, contract_version: int, row_count: int, curated_count: int, quarantine_count: int, published_at: str):
-    ensure_schema(db_path)
-    conn = sqlite3.connect(str(db_path))
-    conn.execute(
-        """
-        INSERT OR REPLACE INTO partitions (year, month, sha256, contract_version, row_count, curated_count, quarantine_count, published_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (year, month, sha , contract_version, row_count, curated_count, quarantine_count, published_at)
-    )
-    conn.commit()
-    conn.close()

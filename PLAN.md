@@ -54,10 +54,10 @@ SQLite con un manifiesto por partición y versión (D-19). Repetir el mismo mes 
 ### Corte 4: ingesta resistente
 Descarga real con timeouts, reintentos solo para errores transitorios (429, 5xx, timeout), 404 como "mes aún no publicado". Tests con servidor HTTP local.
 
-### Corte 5: streaming simulado
-Un replayer lee un mes de raw y emite viajes ordenados por hora de pickup a una cola local. Un consumidor procesa micro-lotes reutilizando las mismas puertas y escribe en particiones por hora. Aquí aparecen datos tardíos y ventanas. Sin broker externo salvo que se decida en un ADR.
+### ~~Corte 5: streaming simulado~~ — descartado
+Los datos de TLC son batch por naturaleza (Parquet mensual). Simular un stream con un replayer no enseña los problemas reales de streaming (backpressure, late data, consumer groups, checkpointing). Si se quiere aprender streaming, hacerlo en un proyecto aparte con una fuente que sea streaming de verdad (websocket de precios, GTFS-RT, etc.).
 
-### Corte 6: marts y observabilidad
+### Corte 5: marts y observabilidad
 Agregados por zona, hora y día con dbt-duckdb. Métricas por etapa, runbook.
 
 ## Layout previsto del repositorio
@@ -111,15 +111,59 @@ Los directorios aparecen cuando existe código que los necesita.
 - Flag `--reprocess`: salta la comprobación de idempotencia.
 - Publicación atómica verificada con fallo inyectado — diferida con tests.
 
+**Tarea 5 (corte 3): incremental y backfill.** ✓
+- `plan.py`: comando `plan` que calcula meses pendientes entre dos fechas consultando el manifiesto (rango por defecto 2024-01 a 2025-12, D-02).
+- `cli.py`: backfill reanudable — los meses ya publicados se saltan por idempotencia; si se interrumpe a mitad, se retoma donde quedó.
+- 2025-01 procesado con `cbd_congestion_fee` sin tocar 2024-01 (columnas opcionales manejadas por T-03, D-16).
+- D-21 registrada: salto en `negative_amount` de 1,26% a 4,16% entre 2024-01 y 2025-01.
+- B-04 y evolución de esquema diferidos: el dataset actual no permite validarlos con datos reales (ver "Pendiente fuera de corte").
+
+**Tarea 6 (corte 4): ingesta resistente.** ✓
+- `acquire.py`: `download(year, month, raw_base_path)` — GET streaming a `.part`, rename por sha al completar. Reintentos con backoff exponencial para 429/5xx/timeout. 404 → `None` (mes no publicado). Timeouts separados: 30s conexión, 300s lectura (D-22).
+- `cli.py`: flag `--download` en `ingest` y `backfill`, excluyente con el origen local (D-23).
+- `pipeline.py`: `run_backfill` maneja ambos modos (descarga o local) en un solo bucle, mes a mes.
+- Probado con descarga real: 2024-02 y 2024-03 descargados y procesados correctamente.
+- D-20 actualizada: TLC republicó los ficheros de 2024 con columnas `month` y `year`.
+- Tests de `download()` con servidor HTTP local diferidos.
+
 ## Siguiente tarea
 
-**Tarea 5 (corte 3): incremental y backfill.**
+**Tarea 7 (corte 5): marts y observabilidad.**
 
-Entregable: un comando `plan` que calcula qué meses faltan entre dos fechas consultando el manifiesto, y procesamiento de 2025-01 (con `cbd_congestion_fee`) sin tocar 2024-01.
+Dos partes, en este orden:
 
-Lo que falta:
-1. Comando `plan` en cli.py: recibe rango de fechas (por defecto 2024-01 a 2025-12, D-02), consulta el manifiesto, lista los meses pendientes.
-2. Procesar 2025-01 con el contrato actual: `cbd_congestion_fee` existe en el fichero, las columnas opcionales ya se manejan (T-03, D-16).
-3. Backfill reanudable: si se interrumpe a mitad de un rango, los meses ya publicados se saltan por idempotencia.
-4. B-04 (warn): si las filas del mes difieren más del 50% respecto al mes anterior publicado en el manifiesto → `row_count_drift`.
-5. Evolución de esquema: si el contrato cambia, bloquear publicación cuando es incompatible con particiones ya publicadas.
+**Parte A — Marts con dbt-duckdb (D-24, D-25).**
+Tres modelos que leen de curated y producen tablas agregadas en `data/marts/`:
+1. `mart_hourly`: viajes, ingreso medio, distancia media, duración media por zona de pickup × hora del día × mes. Responde a "¿qué zonas y franjas horarias generan más viajes y más ingreso?"
+2. `mart_daily`: viajes, ingreso total, distancia media por día natural × mes. Responde a "¿cómo varía la actividad día a día?"
+3. `mart_zone_pair`: viajes y tarifa media por par origen-destino × mes (solo pares con ≥ 10 viajes). Responde a "¿cuáles son las rutas más frecuentes y más caras?"
+
+Cada modelo es incremental por mes: al procesar un nuevo mes, solo se recalcula ese mes.
+Los marts se publican como Parquet en `data/marts/<nombre>/`.
+Un comando `uv run taxis marts` lanza `dbt run` sobre el proyecto dbt que vive en `dbt/`.
+
+Estructura dbt:
+```
+dbt/
+├── dbt_project.yml
+├── profiles.yml
+├── models/
+│   ├── sources.yml          # curated como source
+│   ├── mart_hourly.sql
+│   ├── mart_daily.sql
+│   └── mart_zone_pair.sql
+└── target/                  # no versionado
+```
+
+**Parte B — Observabilidad (D-26). PARA DISCUTIR, puede ser tarea 8.**
+Pendiente de definir el alcance: ¿métricas en el JSON de resumen (ya está parcialmente), log estructurado a stderr, tabla en SQLite, o dashboard? Depende de para quién sea el consumidor.
+
+Lo que falta por decidir antes de programar:
+1. ¿Qué columnas de curated se excluyen de marts? `reasons`, `warnings`, `source_sha256`, etc. son linaje, no análisis. Y `month`/`year` de TLC siguen apareciendo en curated (deberían haberse descartado en S-03).
+2. ¿`dbt-duckdb` como dependencia de desarrollo o de producción? Recomendación: producción, porque los marts son un entregable del pipeline.
+3. ¿Tests dbt (`dbt test`) para validar marts, o tests pytest que lean los Parquet resultantes? Recomendación: ambos — dbt test para unicidad y not-null, pytest para valores esperados.
+
+## Pendiente fuera de corte (por orden de prioridad)
+
+1. **Evolución de esquema.** Cuando el contrato suba de versión, decidir si el cambio es compatible (columna opcional nueva → curated viejo se lee con NULL) o incompatible (cambio de tipo, columna obligatoria nueva → bloquear hasta reprocesar). No se implementa hasta que haya un caso real, pero es lo primero que se aborda al terminar los cortes porque afecta a la integridad de curated a largo plazo.
+2. B-04 (`row_count_drift`): warn si las filas difieren >50% del mes anterior. Útil como red de seguridad, baja prioridad porque el dataset actual es estable.

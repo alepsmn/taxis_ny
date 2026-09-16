@@ -28,7 +28,7 @@ def get_structural_schema(raw_file_path: Path, ) -> tuple[dict[str, str], int, d
         FROM read_parquet(?)
     """, [str(raw_file_path)]
     ).fetchall()
-
+                  # column : datatype   
     file_schema = {schema[0].lower(): schema[1] for schema in object_schema}
 
     for col in CONTRACT_V1:

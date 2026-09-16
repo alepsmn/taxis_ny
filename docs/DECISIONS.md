@@ -156,11 +156,11 @@ Clave primaria: `(year, month)`. Solo un registro activo por partición; un repr
 - `--reprocess` salta la comprobación de idempotencia y actualiza el registro.
 **Estado:** **PARA DISCUTIR** — ¿guardar solo el registro activo por partición, o mantener historial de todas las versiones procesadas? Recomiendo registro activo: el historial vive en git (commits de curated) y en los JSON de resumen impresos por stdout. Una tabla de log solo añade complejidad sin consumidor claro en este corte.
 
-## D-20. El origen añade columnas `month` y `year` a partir de 2025
-**Decisión:** las columnas `month` y `year` que aparecen en el fichero de 2025-01 se descartan con warn (S-03). No se añaden al contrato.
+## D-20. El origen añade columnas `month` y `year`
+**Decisión:** las columnas `month` y `year` que aparecen en los ficheros de TLC se descartan con warn (S-03). No se añaden al contrato.
 **Por qué:** son redundantes con la clave de partición, que se toma del nombre del fichero (D-04). Incorporarlas al contrato no aporta información nueva y crearía ambigüedad si el valor de la columna no coincide con la partición.
-**Evidencia:** 2024-01 tiene 19 columnas; 2025-01 tiene 22 (las 20 del contrato v1 más `month` y `year`). S-03 las detecta y descarta correctamente.
-**Implica:** no hay cambio en código. Si en el futuro más columnas nuevas aparecen, se evalúan una a una.
+**Evidencia:** los ficheros de referencia originales (descarga ago-2026) de 2024-01 tenían 19 columnas y 2025-01 tenía 22. TLC ha republicado los ficheros de 2024: las descargas de sep-2026 de 2024-02 y 2024-03 ya incluyen `month` y `year`. Las columnas aparecen en todo el rango, no solo a partir de 2025.
+**Implica:** no hay cambio en código. S-03 las detecta y descarta correctamente en todos los meses.
 **Estado:** vigente.
 
 ## D-21. Salto en `negative_amount` entre 2024-01 y 2025-01
@@ -169,3 +169,74 @@ Clave primaria: `(year, month)`. Solo un registro activo por partición; un repr
 **Evidencia:** resumen JSON de `ingest 2025-01`: 144.703 quarantine / 3.475.226 total = 4,16%.
 **Implica:** vigilar los próximos meses. B-04 (row_count_drift, pendiente de implementar) ayudará a detectar estos saltos automáticamente. Si 2025-02 supera el 5%, se abre decisión sobre recalibrar B-01.
 **Estado:** vigente.
+
+## D-22. Descarga desde TLC
+**Decisión:** `acquire.py` puede descargar el Parquet mensual desde TLC. URL: `https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_{YYYY}-{MM}.parquet`. La descarga se escribe en un fichero `.part` temporal y se renombra al completar, igual que la publicación (D-18). Si el proceso muere a mitad, el `.part` queda y no se confunde con un fichero completo. La descarga es por streaming (`stream=True`, `iter_content`) para no cargar 50-60 MB en memoria.
+**Política de reintentos:**
+- Reintentar (transitorios): 429, 500, 502, 503, 504, timeout de conexión/lectura, error de conexión. Máximo 4 intentos con backoff exponencial entre ellos (1s, 2s, 4s).
+- No reintentar (permanentes): cualquier otro 4xx (401, 403, etc.). Se propaga la excepción.
+- 404: no es error. Significa que TLC aún no ha publicado ese mes. `download()` devuelve `None`; quien llama lo traduce a `not_published`.
+- Timeouts: 30s de conexión, 300s de lectura.
+- Agotados los intentos: `RuntimeError` encadenado con la última excepción.
+**Librería:** `requests` con `stream=True`. Es dependencia nueva en `pyproject.toml`.
+**Dónde queda el fichero:** en raw, nombrado por su SHA-256, como cualquier otro origen (D-05). `download()` escribe el `.part` en la partición de raw, calcula el hash al completar y renombra a `<sha256>.parquet`. Devuelve ese `Path`. `get_file()` recibe después esa ruta, recalcula el hash y no copia porque el destino ya existe. Así raw tiene una sola copia por fichero y el nombre del fichero nunca depende del nombre que use TLC.
+**Idempotencia:** `ingest --download` de un mes ya publicado descarga igualmente. Es el precio de detectar revisiones del origen (D-05): el hash no se conoce hasta tener los bytes. `backfill --download` no tiene ese coste porque solo pide los meses pendientes según el manifiesto.
+**Implica:** firma `download(year, month, raw_base_path) -> Path | None`. Los mensajes de progreso de la descarga no van por stdout, que está reservado al resumen JSON (corte 1, etapa 6); van por stderr.
+**Estado:** vigente.
+
+## D-23. Flag `--download` en CLI
+**Decisión:** `ingest` recibe un flag `--download`. Si se pasa, descarga de TLC en vez de exigir el fichero local. Los dos modos son excluyentes y pasar ambos, o ninguno, es error con exit 1. `backfill` acepta el mismo flag y descarga cada mes pendiente. Si un mes devuelve 404 durante el backfill, se anota en el resumen y se continúa con el siguiente: no es un error que deba frenar el backfill.
+**Por qué:** un flag explícito deja claro qué va a hacer el comando. Hacer el fichero opcional e inferir "si no lo pasas, descarga" es ambiguo.
+**Nombres:** en `ingest` el origen local es un fichero (`source_file`); en `backfill` es el directorio donde están los ficheros con nombre `yellow_tripdata_YYYY-MM.parquet` (`source_path`). Son cosas distintas y llevan nombre distinto. El nombre Python del flag puede ser `download_flag` para no pisar la función `download` importada, pero el nombre visible en CLI es `--download` (`typer.Option(False, "--download")`).
+**Implica:** `source_file` y `source_path` pasan a ser `Optional[Path]` con default `None`. El resumen de `backfill` distingue lo procesado, lo no encontrado (404 o fichero local ausente) y el error que detuvo el bucle, si lo hubo.
+**Estado:** vigente.
+
+## D-24. Marts con dbt-duckdb
+**Decisión:** los agregados analíticos se construyen con dbt-duckdb. El proyecto dbt vive en `dbt/` dentro del repo. dbt lee de curated (Parquet) y escribe marts como Parquet en `data/marts/<nombre>/`. Un comando `uv run taxis marts` envuelve `dbt run`.
+**Por qué:** dbt aporta tres cosas que merece la pena aprender: un DAG declarativo de modelos SQL, materialización incremental, y tests de esquema integrados (`dbt test`). Hacerlo con scripts SQL sueltos funcionaría, pero no enseña el patrón que usa la industria para la capa de transformación analítica. Además, `dbt-duckdb` no necesita un warehouse remoto: lee y escribe Parquet local, coherente con el stack (D-01).
+**Dependencia:** `dbt-duckdb` se añade como dependencia de producción en `pyproject.toml` (trae `dbt-core` como transitiva). No se añade `dbt-core` por separado.
+**Estructura:**
+```
+dbt/
+├── dbt_project.yml
+├── profiles.yml          # versionado, con paths relativos a data/
+├── models/
+│   ├── sources.yml       # curated como source dbt
+│   ├── mart_hourly.sql
+│   ├── mart_daily.sql
+│   └── mart_zone_pair.sql
+└── target/               # no versionado (.gitignore)
+```
+**profiles.yml versionado:** se versiona porque usa paths relativos y no contiene credenciales. `target/` no se versiona.
+**Implica:** `data/marts/` se añade a `.gitignore` junto con `dbt/target/`. El layout del repo se actualiza en PLAN.md.
+**Estado:** vigente.
+
+## D-25. Definición de marts
+**Decisión:** tres marts, todos incrementales por mes.
+
+**mart_hourly** — granularidad: (mes, zona_pickup, hora_del_día).
+Columnas: `source_month`, `pu_location_id`, `hour_of_day`, `trip_count`, `avg_fare`, `avg_distance`, `avg_duration_min`.
+Responde a: ¿qué zonas y franjas generan más actividad e ingreso?
+
+**mart_daily** — granularidad: (día natural).
+Columnas: `trip_date`, `trip_count`, `total_revenue`, `avg_distance`, `avg_duration_min`.
+Responde a: ¿cómo varía la actividad día a día?
+
+**mart_zone_pair** — granularidad: (mes, zona_pickup, zona_dropoff), solo pares con ≥ 10 viajes.
+Columnas: `source_month`, `pu_location_id`, `do_location_id`, `trip_count`, `avg_fare`.
+Responde a: ¿cuáles son las rutas más frecuentes y más caras?
+
+**Columnas excluidas del cálculo:** `reasons` (siempre vacía en curated), `warnings`, `source_sha256`, `contract_version`, `ingested_at`, `source_year`, `source_month` (se usa solo como clave de partición incremental). Las columnas `month` y `year` de TLC también se excluyen: no deberían estar en curated (S-03 las descarta del schema pero aparecen en el Parquet publicado; corregir antes de construir marts o filtrarlas explícitamente en los modelos).
+**Filtro base en todos los marts:** solo filas de curated, que por definición tienen `reasons` vacía. No se aplica filtro adicional sobre warnings: un viaje con `zero_distance` o `passenger_count_unknown` es un viaje válido para contar y promediar.
+**Incrementalidad:** cada modelo filtra por `source_year` y `source_month` para procesar solo el mes nuevo. En dbt: `{% if is_incremental() %} WHERE source_year = ... AND source_month = ... {% endif %}`. Al reprocesar un mes (`--reprocess`), se rehacen sus marts: `dbt run --full-refresh` o borrar las filas del mes antes de insertar.
+**Estado:** vigente.
+
+## D-26. Observabilidad — **PARA DISCUTIR**
+**Opciones:**
+1. **Solo el JSON de resumen actual.** Ya tiene filas leídas, curated, quarantine, conteo por reason_code. Bastaría con guardar cada JSON en `data/control/runs/YYYY-MM.json` y leerlos cuando haga falta.
+2. **Tabla `runs` en SQLite** (al lado del manifiesto). Cada ejecución registra: partición, timestamp, filas por etapa, duración por etapa, resultado (ok/block/error). Se puede consultar con SQL.
+3. **Log estructurado a stderr.** Cada etapa emite una línea JSON con timestamp, stage, rows_in, rows_out, duration_ms. Se redirige a fichero. Compatible con herramientas como `jq`.
+
+**Recomendación:** opción 2 (tabla `runs` en SQLite). Es consultable, no requiere parsear ficheros, y es coherente con el manifiesto (D-19). La opción 3 se puede añadir encima sin conflicto.
+**Alcance:** esto puede ser una tarea separada (tarea 8) después de los marts. Los marts son el entregable principal del corte 5; la observabilidad es el complemento.
+**Estado:** **PARA DISCUTIR**.

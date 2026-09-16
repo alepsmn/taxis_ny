@@ -1,6 +1,6 @@
 import duckdb, json
 
-from taxis.acquire import get_file
+from taxis.acquire import get_file, download
 from taxis.manifest import lookup, register
 from taxis.gates.structural import get_structural_schema
 from taxis.transforms import col_transformations
@@ -13,16 +13,17 @@ from taxis.exceptions import FileBlocked, ParquetNoEscrito
 from datetime import datetime, timezone
 from pathlib import Path
 
-def run_ingest(date: str, source_path: Path, reprocess: bool = False, db_path: Path = Path('data/control/manifest.db')):
-    year, month = date.split('-')
-    file_sha, raw_file_path = get_file(source_path, Path('data/raw'), int(year), int(month))
+
+def run_ingest(year: int, month:int, source_file_path: Path, reprocess: bool = False, db_path: Path = Path('data/control/manifest.db')):
+    file_sha, raw_file_path = get_file(source_file_path, Path('data/raw'), year, month)
 
     if not reprocess:
-        revised_sha = lookup(db_path, int(year), int(month))
+        revised_sha = lookup(db_path, year, month)
         # No son fallos de bloqueo, avisan y continuan si se hacen varias ingestas seguidas
         if revised_sha == file_sha:
             return {"status": "skipped", "reason": "already_published"}
         if revised_sha is not None:
+            # ya hay un sha para esa fecha y no coincide con el del archivo actual
             return {"status": "revision detected", "message": "try: --reprocess"}
 
     metadata_cols, row_count, file_schema = get_structural_schema(raw_file_path)
@@ -30,7 +31,7 @@ def run_ingest(date: str, source_path: Path, reprocess: bool = False, db_path: P
     if metadata_cols["block"]:
         raise FileBlocked(metadata_cols, "S", year, month)
 
-    transformed_cols = col_transformations(raw_file_path, file_schema, file_sha, int(year), int(month))
+    transformed_cols = col_transformations(raw_file_path, file_schema, file_sha, year, month)
     validated_rows = validate_row_quality(transformed_cols)
 
     meta_batch, curated_rows, quarantine_rows, total_curated, total_quarantine, reasons_rejected_count, reasons_warning_count = batch_gate(validated_rows, row_count)
@@ -53,10 +54,11 @@ def run_ingest(date: str, source_path: Path, reprocess: bool = False, db_path: P
 
     if all(written_paths):
         published_at = datetime.now(timezone.utc).isoformat()
-        register(db_path, int(year), int(month), file_sha, 1, int(row_count), int(total_curated), int(total_quarantine), published_at)
+        register(db_path, year, month, file_sha, 1, int(row_count), int(total_curated), int(total_quarantine), published_at)
 
     result = {
-            "month": date,
+            "year": year,
+            "month": month,
             "sha256": file_sha,
             "row_count": row_count,
             "gates": metadata_cols,
@@ -69,7 +71,7 @@ def run_ingest(date: str, source_path: Path, reprocess: bool = False, db_path: P
     return result
 
 # source_path: donde estan los archivos originales descargados - data/reference
-def run_backfill(source_path: Path, date_from: str, date_to: str, db_path: Path = Path('data/control/manifest.db')):
+def run_backfill(download_flag: bool, source_path: Path, date_from: str, date_to: str, db_path: Path = Path('data/control/manifest.db')):
     info_missed = missing_processed_files(date_from, date_to, db_path)
     pending_tasks = info_missed["pending"]
     processed_tasks = 0
@@ -78,17 +80,25 @@ def run_backfill(source_path: Path, date_from: str, date_to: str, db_path: Path 
     
     for task in pending_tasks:
         year, month = task.split('-')
-        final_path = source_path / f"yellow_tripdata_{year}-{month}.parquet"
-        if final_path.exists():
-            try:
-                result = run_ingest(task, final_path)
-                processed_tasks += 1
-                print(json.dumps(result, indent=2))
-            except (FileBlocked, ParquetNoEscrito) as e:
-                error = {"task": task, "error": str(e)}
-                break
+
+        if download_flag:
+            final_path = download(int(year), int(month), Path('data/raw'))
+            if final_path is None:
+                not_found_paths.append(task)
+                continue # siguiente iter para evitar el None
         else:
-            not_found_paths.append(task)
+            final_path = source_path / f"yellow_tripdata_{year}-{month}.parquet"
+            if not final_path.exists():
+                not_found_paths.append(task)
+                continue
+
+        try:
+            result = run_ingest(task, final_path)
+            processed_tasks += 1
+            print(json.dumps(result, indent=2))
+        except (FileBlocked, ParquetNoEscrito) as e:
+            error = {"task": task, "error": str(e)}
+            break
 
     balance_summary = {
         "total_tasks": len(pending_tasks),

@@ -31,6 +31,7 @@ CONTRACT_V1 = [
 ]
 
 COMPATIBLE_TYPES = {
+    # schema, contract
     ("BIGINT", "INTEGER"),
     ("INTEGER", "INTEGER"),
     ("DOUBLE", "DOUBLE"),
