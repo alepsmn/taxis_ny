@@ -13,11 +13,13 @@ def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict
     published_tasks = []
     expected_tasks = 0
 
+    # itera por el rango de fecha seleccionada 
     while actual_date <= end_date:
         expected_tasks += 1
         year = actual_date.year
         month = actual_date.month
 
+        # devuelve los metadatos de un fichero para un mes
         row = lookup_published(db_path, year, month)
         if not row:
             pending_tasks.append(f"{year}-{month:02d}")
@@ -32,7 +34,7 @@ def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict
             )
         actual_date += relativedelta(months=1)
 
-    return {
+    return { 
         "range": {
             "from": f"{date_from}", "to": f"{date_to}"
         },
