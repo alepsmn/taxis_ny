@@ -10,3 +10,5 @@ data/recreation_scripts/
 *.log
 .local/
 recreacion/
+dbt/target/
+dbt/logs/

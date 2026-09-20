@@ -28,7 +28,7 @@ def download(year: int, month: int, raw_base_path: Path):
     part_path = raw_base_path / f"year={year}" / f"month={month}" / f"download.part"
     part_path.parent.mkdir(parents=True, exist_ok=True)
 
-    last_exc : Exception | None = None
+    last_exc = Exception | None = None
     for attempt in range(MAX_RETRIES):
         try:
             with requests.get(url, stream=True, timeout=(REQUEST_TIMEOUT, REQUEST_TIMEOUT_READ)) as r:

@@ -1,0 +1,9 @@
+# conexion a la bbdd ~ connection string
+# rutas relativas a la raíz del proyecto (donde se ejecuta `taxis marts`)
+
+taxis:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "data/marts/marts.duckdb"

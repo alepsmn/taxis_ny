@@ -2,7 +2,7 @@ import duckdb
 from pathlib import Path
 from taxis.contract import CONTRACT_V1, COMPATIBLE_TYPES
 
-def get_structural_schema(raw_file_path: Path, ) -> tuple[dict[str, str], int, dict[str, str]]:
+def get_structural_schema(raw_file_path: Path) -> tuple[dict[str, str], int, dict[str, str]]:
     metadata_cols = {
         "block": [],
         "warn": []

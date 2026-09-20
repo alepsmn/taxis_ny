@@ -34,6 +34,7 @@ def missing_processed_files(date_from: str, date_to: str, db_path: Path) -> dict
             )
         actual_date += relativedelta(months=1)
 
+    # Datos del PROCESO, no de los archivos
     return { 
         "range": {
             "from": f"{date_from}", "to": f"{date_to}"

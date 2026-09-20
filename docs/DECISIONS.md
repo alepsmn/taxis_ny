@@ -214,29 +214,49 @@ dbt/
 ## D-25. Definición de marts
 **Decisión:** tres marts, todos incrementales por mes.
 
-**mart_hourly** — granularidad: (mes, zona_pickup, hora_del_día).
-Columnas: `source_month`, `pu_location_id`, `hour_of_day`, `trip_count`, `avg_fare`, `avg_distance`, `avg_duration_min`.
+**mart_hourly** — granularidad: (año, mes, zona_pickup, hora_del_día).
+Columnas: `source_year`, `source_month`, `pu_location_id`, `hour_of_day`, `trip_count`, `avg_fare`, `avg_distance`, `avg_duration_min`.
 Responde a: ¿qué zonas y franjas generan más actividad e ingreso?
 
 **mart_daily** — granularidad: (día natural).
 Columnas: `trip_date`, `trip_count`, `total_revenue`, `avg_distance`, `avg_duration_min`.
 Responde a: ¿cómo varía la actividad día a día?
 
-**mart_zone_pair** — granularidad: (mes, zona_pickup, zona_dropoff), solo pares con ≥ 10 viajes.
-Columnas: `source_month`, `pu_location_id`, `do_location_id`, `trip_count`, `avg_fare`.
+**mart_zone_pair** — granularidad: (año, mes, zona_pickup, zona_dropoff), solo pares con ≥ 10 viajes.
+Columnas: `source_year`, `source_month`, `pu_location_id`, `do_location_id`, `trip_count`, `avg_fare`.
 Responde a: ¿cuáles son las rutas más frecuentes y más caras?
 
-**Columnas excluidas del cálculo:** `reasons` (siempre vacía en curated), `warnings`, `source_sha256`, `contract_version`, `ingested_at`, `source_year`, `source_month` (se usa solo como clave de partición incremental). Las columnas `month` y `year` de TLC también se excluyen: no deberían estar en curated (S-03 las descarta del schema pero aparecen en el Parquet publicado; corregir antes de construir marts o filtrarlas explícitamente en los modelos).
+**`source_year` en el grano:** los marts originales agrupaban solo por `source_month` (1-12), lo que mezclaría enero de 2024 con enero de 2025 al procesar varios años. Añadir `source_year` al grano de `mart_hourly` y `mart_zone_pair` hace que cada fila represente un mes-calendario concreto, y es necesario para que `delete+insert` borre solo las filas del mes que se reprocesa. `mart_daily` no necesita `source_year` en su salida porque `trip_date` ya identifica el día sin ambigüedad.
+**Columnas excluidas del cálculo:** `reasons` (siempre vacía en curated), `warnings`, `source_sha256`, `contract_version`, `ingested_at`. Las columnas `month` y `year` de TLC también se excluyen (S-03 las descarta del schema pero DuckDB las genera por Hive partitioning al leer `year=*/month=*/`; los modelos las ignoran y usan `source_year`/`source_month` del linaje).
 **Filtro base en todos los marts:** solo filas de curated, que por definición tienen `reasons` vacía. No se aplica filtro adicional sobre warnings: un viaje con `zero_distance` o `passenger_count_unknown` es un viaje válido para contar y promediar.
-**Incrementalidad:** cada modelo filtra por `source_year` y `source_month` para procesar solo el mes nuevo. En dbt: `{% if is_incremental() %} WHERE source_year = ... AND source_month = ... {% endif %}`. Al reprocesar un mes (`--reprocess`), se rehacen sus marts: `dbt run --full-refresh` o borrar las filas del mes antes de insertar.
+**Incrementalidad:** ver D-27.
 **Estado:** vigente.
 
-## D-26. Observabilidad — **PARA DISCUTIR**
-**Opciones:**
-1. **Solo el JSON de resumen actual.** Ya tiene filas leídas, curated, quarantine, conteo por reason_code. Bastaría con guardar cada JSON en `data/control/runs/YYYY-MM.json` y leerlos cuando haga falta.
-2. **Tabla `runs` en SQLite** (al lado del manifiesto). Cada ejecución registra: partición, timestamp, filas por etapa, duración por etapa, resultado (ok/block/error). Se puede consultar con SQL.
-3. **Log estructurado a stderr.** Cada etapa emite una línea JSON con timestamp, stage, rows_in, rows_out, duration_ms. Se redirige a fichero. Compatible con herramientas como `jq`.
+## D-27. DuckDB persistente, incrementalidad y rutas portables
+**Decisión:** tres cambios que van juntos porque se necesitan mutuamente.
 
-**Recomendación:** opción 2 (tabla `runs` en SQLite). Es consultable, no requiere parsear ficheros, y es coherente con el manifiesto (D-19). La opción 3 se puede añadir encima sin conflicto.
-**Alcance:** esto puede ser una tarea separada (tarea 8) después de los marts. Los marts son el entregable principal del corte 5; la observabilidad es el complemento.
-**Estado:** **PARA DISCUTIR**.
+**DuckDB persistente.** `profiles.yml` pasa de `path: ":memory:"` a `path: "data/marts/marts.duckdb"`. Con `:memory:` las tablas desaparecían al terminar dbt y `is_incremental()` era siempre `False`. Con un fichero en disco, las tablas persisten entre ejecuciones y dbt puede detectar qué meses ya están procesados.
+**Por qué no queda en `:memory:`:** la incrementalidad de dbt requiere que la tabla exista de una ejecución a la siguiente. Sin persistencia no hay referencia contra la que comparar.
+
+**Incrementalidad `delete+insert`.** Los modelos cambian de `materialized='external'` a `materialized='incremental'` con `incremental_strategy='delete+insert'` y `unique_key=['source_year', 'source_month']` (en `mart_daily`, `unique_key=['trip_date']`). Un filtro `{% if is_incremental() %} WHERE (source_year, source_month) NOT IN (SELECT DISTINCT ... FROM {{ this }}) {% endif %}` excluye los meses que ya están en la tabla. `delete+insert` es la red de seguridad: si llegan datos de un mes que ya existía, borra las filas viejas antes de insertar las nuevas. Para reprocesar un mes, se usa `dbt run --full-refresh`.
+**Por qué `delete+insert` y no `append`:** con `append`, un fallo o una re-ejecución duplicaría filas. `delete+insert` garantiza idempotencia a nivel de mes.
+
+**Exportación a Parquet.** `materialized='external'` escribía los Parquet directamente. Con `incremental`, los marts viven como tablas en `marts.duckdb`. El comando `taxis marts` exporta cada tabla a `data/marts/<nombre>.parquet` con `COPY ... TO ... (FORMAT PARQUET)` después de `dbt run`. Ambos formatos coexisten: DuckDB es la fuente de verdad incremental, Parquet es la copia publicada.
+
+**Rutas portables.** `profiles.yml`, `sources.yml` y los modelos ya no contienen `/home/alex/taxis/`. Todas las rutas son relativas a la raíz del proyecto, que es desde donde se ejecuta `taxis marts` (`uv run dbt run --project-dir dbt --profiles-dir dbt`). DuckDB resuelve las rutas relativas desde el CWD del proceso.
+**Por qué no `env_var()`:** el comando siempre se lanza desde la raíz del proyecto. Una variable de entorno solo añadiría un paso de configuración sin consumidor que lo justifique.
+
+**Implica:**
+- `profiles.yml`: `path: "data/marts/marts.duckdb"`.
+- `sources.yml`: `external_location: "data/curated_rows/year=*/month=*/curated_rows.parquet"`.
+- Los modelos no tienen `location`; ya no usan `materialized='external'`.
+- `cli.py`: `marts()` añade el paso de exportación a Parquet tras `dbt run`.
+- `.gitignore`: `dbt/target/` y `dbt/logs/` añadidos (`data/marts/` ya está cubierto por `data/`).
+- `marts.duckdb` se crea automáticamente en la primera ejecución. Borrarlo equivale a `--full-refresh`.
+**Estado:** vigente.
+
+## D-26. Observabilidad — descartada
+**Decisión:** no se implementa una capa de observabilidad adicional.
+**Por qué:** el pipeline ya emite un JSON de resumen por stdout con filas leídas, curated, quarantine, conteo por reason_code y resultado de cada gate. El manifiesto SQLite (D-19) registra qué se publicó y cuándo. Con 24 particiones en un entorno local, no hay ejecuciones desatendidas ni consumidores que necesiten alertas o dashboards. Añadir una tabla `runs` o log estructurado sería un `INSERT INTO` sin consumidor real — esfuerzo que no enseña nada nuevo ni mejora el pipeline.
+**En producción se haría distinto:** si el pipeline corriera en un scheduler (Airflow, cron) sin nadie mirando, se añadiría: tabla `runs` en SQLite para consultar historial, métricas por etapa (filas/segundo, duración), alertas cuando el ratio de rechazo suba (D-21 como antecedente), y log estructurado compatible con un agregador (ELK, Datadog). La infraestructura actual no lo justifica.
+**Estado:** descartada.

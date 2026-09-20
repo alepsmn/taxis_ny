@@ -1,0 +1,9 @@
+name: taxis_marts
+version: '1.0.0'
+profile: taxis
+
+model-paths: ["models"]
+target-path: "target"
+
+clean-targets:
+  - "target"

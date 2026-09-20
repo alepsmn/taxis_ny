@@ -126,42 +126,19 @@ Los directorios aparecen cuando existe código que los necesita.
 - D-20 actualizada: TLC republicó los ficheros de 2024 con columnas `month` y `year`.
 - Tests de `download()` con servidor HTTP local diferidos.
 
+## Completado (corte 5)
+
+**Tarea 7A (corte 5, parte A): marts con dbt-duckdb.** ✓
+- Tres modelos incrementales: `mart_hourly`, `mart_daily`, `mart_zone_pair` (D-24, D-25).
+- DuckDB persistente en `data/marts/marts.duckdb`, incrementalidad con `delete+insert` por mes (D-27).
+- Rutas portables: eliminadas todas las rutas absolutas de `profiles.yml`, `sources.yml` y modelos (D-27).
+- `source_year` añadido al grano de `mart_hourly` y `mart_zone_pair` para no mezclar meses de distintos años (D-25 actualizada).
+- Exportación a Parquet desde `cli.py` tras `dbt run`.
+- `.gitignore`: `dbt/target/`, `dbt/logs/` añadidos.
+
 ## Siguiente tarea
 
-**Tarea 7 (corte 5): marts y observabilidad.**
-
-Dos partes, en este orden:
-
-**Parte A — Marts con dbt-duckdb (D-24, D-25).**
-Tres modelos que leen de curated y producen tablas agregadas en `data/marts/`:
-1. `mart_hourly`: viajes, ingreso medio, distancia media, duración media por zona de pickup × hora del día × mes. Responde a "¿qué zonas y franjas horarias generan más viajes y más ingreso?"
-2. `mart_daily`: viajes, ingreso total, distancia media por día natural × mes. Responde a "¿cómo varía la actividad día a día?"
-3. `mart_zone_pair`: viajes y tarifa media por par origen-destino × mes (solo pares con ≥ 10 viajes). Responde a "¿cuáles son las rutas más frecuentes y más caras?"
-
-Cada modelo es incremental por mes: al procesar un nuevo mes, solo se recalcula ese mes.
-Los marts se publican como Parquet en `data/marts/<nombre>/`.
-Un comando `uv run taxis marts` lanza `dbt run` sobre el proyecto dbt que vive en `dbt/`.
-
-Estructura dbt:
-```
-dbt/
-├── dbt_project.yml
-├── profiles.yml
-├── models/
-│   ├── sources.yml          # curated como source
-│   ├── mart_hourly.sql
-│   ├── mart_daily.sql
-│   └── mart_zone_pair.sql
-└── target/                  # no versionado
-```
-
-**Parte B — Observabilidad (D-26). PARA DISCUTIR, puede ser tarea 8.**
-Pendiente de definir el alcance: ¿métricas en el JSON de resumen (ya está parcialmente), log estructurado a stderr, tabla en SQLite, o dashboard? Depende de para quién sea el consumidor.
-
-Lo que falta por decidir antes de programar:
-1. ¿Qué columnas de curated se excluyen de marts? `reasons`, `warnings`, `source_sha256`, etc. son linaje, no análisis. Y `month`/`year` de TLC siguen apareciendo en curated (deberían haberse descartado en S-03).
-2. ¿`dbt-duckdb` como dependencia de desarrollo o de producción? Recomendación: producción, porque los marts son un entregable del pipeline.
-3. ¿Tests dbt (`dbt test`) para validar marts, o tests pytest que lean los Parquet resultantes? Recomendación: ambos — dbt test para unicidad y not-null, pytest para valores esperados.
+Corte 5 cerrado. Los cinco cortes del pipeline están completos. Ver "Pendiente fuera de corte" para posibles extensiones.
 
 ## Pendiente fuera de corte (por orden de prioridad)
 

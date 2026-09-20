@@ -31,6 +31,25 @@ resultados de los metadatos del proceso para ese fichero, descargado o existente
 
 Las excepciones capturadas son FileBlock (SystemExit(2)) y ParquetNoEscrito (SystemExit(3))
 
+***acquire.py***
+*get_file*
+Parametros:
+source_path: str - ruta del archivo origen
+raw_base_path: str - ruta base donde se esrcibria el sha.parquet
+year: ano del archivo
+month: mes del archivo
+Devuelve:
+file_sha, raw_file_path
+
+Se calcula el file_sha del archivo actual para renombrar el original e identificarlo por este. Se crea la ruta final (raw_file_path) para materializar
+la ruta padre que albergara el archivo por reemplazo (shutil.copy2)
+
+*download*
+Parametros:
+year: int
+month: int
+raw_base
+
 
 ***Pipeline.py***
 *run_ingest*

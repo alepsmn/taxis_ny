@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: curated
+    tables:
+      - name: trips
+        meta:
+          external_location: "data/curated_rows/year=*/month=*/curated_rows.parquet"
