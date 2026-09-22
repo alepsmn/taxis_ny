@@ -6,7 +6,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/chechout@v4
+      - uses: actions/checkout@v4
 
       - uses: astral-sh/setup-uv@v6
         with:
@@ -15,5 +15,5 @@ jobs:
       - run: uv sync
 
       - run: uv run ruff check src/ tests/
-      
+
       - run: uv run pytest -v
