@@ -48,7 +48,7 @@ def register(db_path: Path, year: int, month: int, sha: str, contract_version: i
 
 def lookup_published(db_path: Path, year: int, month: int) -> sqlite3.Row:
     conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row # ahora devuelve obj Row ~ dict (acceso por claves)
+    conn.row_factory = sqlite3.Row # ahora devuelve obj Row ~ dict (acceso por claves sin depende de posiciones de tupla)
     published = conn.execute(
         """
         SELECT *

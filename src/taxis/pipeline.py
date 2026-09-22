@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-def run_ingest(year: int, month:int, source_file_path: Path, raw_base_path: Path, db_path: Path, reprocess: bool = False):
+def run_ingest(year: int, month:int, source_file_path: Path, raw_base_path: Path, db_path: Path, reprocess: bool = False) -> dict[str, str]:
     file_sha, raw_file_path = get_raw_file(source_file_path, raw_base_path, year, month)
 
     if not reprocess:

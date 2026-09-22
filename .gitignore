@@ -12,3 +12,4 @@ data/recreation_scripts/
 recreacion/
 dbt/target/
 dbt/logs/
+src_reconstr/taxis/

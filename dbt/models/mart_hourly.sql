@@ -14,7 +14,7 @@ SELECT
     AVG(trip_distance)                    AS avg_distance,
     AVG(duration_min)                     AS avg_duration_min
 FROM {{ source('curated', 'trips') }}
-{% if is_incremental() %}
+{% if is_incremental() %} -- True cuando la tabla ya existe en la bbdd y no se pasa --full-refresh por comando
 WHERE (source_year, source_month) NOT IN ( -- "la tupla" que filtra no puede estar en la las tuplas del "resultado"
     SELECT DISTINCT source_year, source_month FROM {{ this }} -- this es la mart_hourly
 )

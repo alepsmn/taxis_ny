@@ -138,7 +138,28 @@ Los directorios aparecen cuando existe código que los necesita.
 
 ## Siguiente tarea
 
-Corte 5 cerrado. Los cinco cortes del pipeline están completos. Ver "Pendiente fuera de corte" para posibles extensiones.
+**Tarea 8: tests y CI.**
+
+Tres bloques de tests, de más a menos interesante, y un CI básico al final.
+
+**Bloque 1 — Reglas de fila (R-xx).** ~8-10 tests.
+Fixture que crea un mini-DataFrame con filas diseñadas (una buena, una con duración negativa, fare < 0, zona fuera de rango, etc.). Cada regla se testea con `@pytest.mark.parametrize` pasando el valor y el `reason_code` esperado. Valores límite incluidos (e.g. distancia = 200 exacto vs 200.1).
+Demuestra: parametrize, fixtures, testing de lógica de negocio, valores límite.
+
+**Bloque 2 — Transformaciones (T-xx) y puerta estructural (S-xx).** ~4-5 tests.
+Fixture que genera un mini-Parquet (5-10 filas) con `tmp_path`. Pasarlo por `transforms` y verificar nombres snake_case, tipos del contrato, cálculo de `duration_min`. Para structural, un Parquet con columna de más, otro con columna de menos.
+Demuestra: fixtures de datos, setup/teardown con `tmp_path`, testing de transformaciones.
+
+**Bloque 3 — Idempotencia y batch.** ~3-4 tests.
+Procesar un mini-Parquet, verificar que el manifiesto tiene el registro. Procesarlo otra vez, verificar que no se reprocesó. Batch: verificar que > 5% rejects produce block.
+Demuestra: test de integración, testing de efectos secundarios (estado en SQLite), idempotencia.
+
+**CI con GitHub Actions.**
+Un `.github/workflows/ci.yml` que instala uv + Python 3.12, corre `uv run pytest` y pasa `ruff`. Se monta después de tener los tests en verde.
+
+**No se testea:** el CLI (es pegamento), la descarga HTTP (requeriría mock server), los marts dbt (se testean con `dbt test`).
+
+Total estimado: ~15-20 tests.
 
 ## Pendiente fuera de corte (por orden de prioridad)
 
